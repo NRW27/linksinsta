@@ -26,7 +26,8 @@
     --accent: #5a67e6;      /* aktiver Punkt */
     --dot: #d2d2d8;        /* inaktive Punkte */
     --placeholder: #b960dd; /* Platzhalterfarbe, solange ein Beitragsbild lädt */
-    --dim: 0.3;             /* Abdunklung aller Beitragsbilder (0.3 = 30 %) */
+    --dim: 0.3;             /* Deckkraft der Abdunklung aller Beitragsbilder (0.3 = 30 %) */
+    --dim-farbe: 129 0 161; /* Farbe der Abdunklung als RGB-Kanäle: #8100A1 (Rückbau auf Schwarz: 0 0 0) */
     --verlauf-start: 30%;   /* Höhe im Bild (von oben), ab der der Rot-Verlauf beginnt */
     --verlauf-ende: 100%;   /* Höhe im Bild (von oben), an der das Bild vollständig in #FF0000 übergegangen ist */
     --blende-dauer: 220ms;  /* Überblendung beim Bildwechsel (kurz und sanft; 0ms = harter Wechsel) */
@@ -134,7 +135,7 @@
     content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
     background:
       linear-gradient(var(--verlauf-richtung), #ff000000 var(--verlauf-start), #ff0000 var(--verlauf-ende)),
-      rgb(0 0 0 / var(--dim));
+      rgb(var(--dim-farbe) / var(--dim));
   }
   .overlay { position: absolute; inset: 0; z-index: 2; color: #fff; text-align: center; pointer-events: none; }
   /* Zwei Textzonen: Forderung am unteren Rand des oberen Drittels, Erklärung am oberen Rand der unteren Hälfte des Bildes (so nah wie möglich beieinander) */
