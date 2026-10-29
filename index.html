@@ -283,6 +283,9 @@
   .ki-go[aria-disabled="true"] { background: #e4e4ea; color: #8a8a94; pointer-events: none; }
   .ki-cancel { display: block; width: 100%; margin-top: 4px; padding: 12px; font-size: 14px; color: #777; }
 
+  /* ---------- Export-Dialog (Symbol 1201.svg): nutzt Overlay, Dialog und Auswahlfelder des KI-Fensters ---------- */
+  .ex-go { width: 100%; }   /* .ki-go ist für einen Link gedacht, hier ein Button */
+
   /* ---------- Feedback-Dialog (Symbol 1202.svg): nutzt Overlay und Dialog des KI-Fensters ---------- */
   .fb-field { display: block; width: 100%; margin-top: 10px; padding: 12px 14px; font: inherit; font-size: 16px; color: var(--text); border: 2px solid #e4e4ea; border-radius: 14px; background: #fff; }   /* 16 px: iOS zoomt sonst ins Feld */
   textarea.fb-field { resize: vertical; min-height: 110px; }
@@ -578,7 +581,7 @@ const POSTS = FEED_ORDER.map(nrs => ({
   shared: 0,   // Teilen-Klicks für die Reihenfolge (Zählung noch nicht angebunden)
   actions: [
     { icon: '1200.svg', iconOn: '1200-aktiv.svg', label: 'Gefällt mir', count: 397, action: 'like' },   // Klick: Herz füllt sich (1200-aktiv.svg), Zahl +1
-    { icon: '1201.svg', label: 'Kommentieren', count: 0, action: 'share' },   // öffnet das Teilen-Menü; angezeigte Zahl = p.shared (siehe Rendering)
+    { icon: '1201.svg', label: 'Exportieren', count: 0, action: 'share' },   // öffnet den Export-Dialog (ganzer Beitrag / nur Bild / nur Text); angezeigte Zahl = p.shared (siehe Rendering)
     { icon: '1202.svg', label: 'Feedback senden', action: 'feedback' },   // ohne Zahl; öffnet den Feedback-Dialog
   ],
   save: { icon: '1203.svg', label: 'Speichern' },
@@ -627,7 +630,7 @@ const RANK = { cMin: 0.5, cMax: 2, sharedWeight: 10 };
   POSTS.splice(0, POSTS.length, ...scored.map(x => x.p));
 }
 
-// Inhalt des Teilen-Menüs (vorläufig ein generischer Link; später z. B. um title/text oder beitragsspezifische Links erweitern)
+// Generischer Link zum Teilen. Wird derzeit nicht verwendet (der Export-Dialog teilt Bild bzw. Text), bleibt aber für einen späteren Link-Export erhalten.
 const SHARE = { url: 'https://www.dielinke-nrw.de/landesverband/landtagswahl-2027/' };
 
 { // Plausibilitätsprüfung der Reihenfolge (Meldung nur in der Browser-Konsole)
@@ -771,9 +774,7 @@ document.getElementById('feed').innerHTML = POSTS.map((p, pi) => `
     </div>
   </article>`).join('');
 
-/* =====================  Teilen  =====================
-   Öffnet das systemeigene Teilen-Menü (Web Share API; braucht https und einen Klick/Tipp).
-   Ohne Unterstützung (z. B. viele Desktop-Browser) wird der Link in die Zwischenablage kopiert. */
+/* =====================  Kurzer Hinweis (Toast)  ===================== */
 const toastEl = document.createElement('div');
 toastEl.className = 'toast';
 toastEl.setAttribute('role', 'status');
@@ -786,15 +787,149 @@ const toast = msg => {
   toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
 };
 
-async function share() {
-  if (navigator.share) {
-    try { await navigator.share(SHARE); }
-    catch (e) { if (e.name !== 'AbortError') console.warn('Teilen fehlgeschlagen:', e); }   // AbortError = Menü wurde geschlossen
-    return;
+/* =====================  Export  =====================
+   Öffnet sich über das Symbol 1201.svg (data-action="share"). Exportiert wird die Forderung, die im angetippten Beitrag gerade sichtbar ist.
+   Drei Arten (Tabelle EXPORT_ARTEN):
+     beitrag – ganzer Beitrag als Bilddatei.  TEST: derzeit das Beitragsbild selbst (z. B. 035.jpg); später das fertig gesetzte Bild mit Text.
+     bild    – nur das Bild als Bilddatei.    TEST: derzeit ebenfalls das Beitragsbild (z. B. 035.jpg); wird später noch verändert.
+     text    – nur der Text (Forderung und Erklärung), ohne die **-Markierungen.
+   Bilder gehen über das systemeigene Teilen-Menü (Web Share API mit Datei; braucht https und einen Tipp), sonst als Download.
+   Text geht über das Teilen-Menü, sonst in die Zwischenablage.
+   Die Bilddatei wird schon beim Auswählen geladen, damit das Teilen-Menü beim Tipp auf „Exportieren“ sofort aufgeht (iOS verlangt das). */
+const dateiName = u => String(u).split('?')[0].split('/').pop();
+const klartext = s => String(s).replace(/\*\*(.+?)\*\*/g, '$1').replace(/\s+/g, ' ').trim();   // ohne **-Markierung und ohne Zeilenumbrüche
+const EXPORT_ARTEN = [
+  { id: 'beitrag', name: 'Ganzer Beitrag', info: f => 'Bilddatei: ' + dateiName(f.img), bild: f => f.img },
+  { id: 'bild',    name: 'Nur das Bild',   info: f => 'Bilddatei: ' + dateiName(f.img), bild: f => f.img },
+  { id: 'text',    name: 'Nur der Text',   info: () => 'Forderung und Erklärung',        text: f => klartext(f.head) + '\n\n' + klartext(f.text) },
+];
+
+// Aktuell sichtbare Forderung (vollständiger Eintrag aus FORDERUNGEN) des Beitrags, in dem das Symbol angetippt wurde
+const forderungVon = btn => {
+  const { nr } = currentForderung(btn);
+  return FORDERUNGEN.find(x => String(x.nr) === nr) || null;
+};
+
+const exCache = new Map();   // Bild-Adresse → Promise auf die geladene Datei (oder null)
+function exDatei(url) {
+  if (!exCache.has(url)) {
+    exCache.set(url, (async () => {
+      try {
+        const r = await fetch(url);
+        if (!r.ok) throw r.status;
+        const b = await r.blob(), name = dateiName(url);
+        return new File([b], name, { type: b.type.startsWith('image/') ? b.type : /\.png$/i.test(name) ? 'image/png' : 'image/jpeg' });
+      } catch {
+        exCache.delete(url);   // nächster Versuch lädt neu
+        return null;           // z. B. beim Öffnen per file:// – dann greift der Download-Weg
+      }
+    })());
   }
-  try { await navigator.clipboard.writeText(SHARE.url); toast('Link kopiert'); }
-  catch { window.prompt('Link zum Kopieren:', SHARE.url); }
+  return exCache.get(url);
 }
+
+// Rückgabe: true = erledigt, false = Teilen-Menü wurde geschlossen (Dialog bleibt offen)
+async function exportiereBild(url) {
+  const file = await exDatei(url);
+  if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file] }); return true; }
+    catch (e) {
+      if (e.name === 'AbortError') return false;
+      console.warn('Teilen fehlgeschlagen, Bild wird heruntergeladen:', e);
+    }
+  }
+  const a = document.createElement('a');
+  a.href = file ? URL.createObjectURL(file) : url;
+  a.download = dateiName(url);
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  if (file) setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  toast('Download gestartet: ' + dateiName(url));
+  return true;
+}
+async function exportiereText(text) {
+  if (navigator.share) {
+    try { await navigator.share({ text }); return true; }
+    catch (e) {
+      if (e.name === 'AbortError') return false;
+      console.warn('Teilen fehlgeschlagen, Text wird kopiert:', e);
+    }
+  }
+  try { await navigator.clipboard.writeText(text); toast('Text kopiert'); }
+  catch { window.prompt('Text zum Kopieren:', text); }
+  return true;
+}
+
+const exEl = document.createElement('div');
+exEl.className = 'ki-overlay';   // übernimmt Weichzeichner und Einblendung des KI-Fensters
+exEl.innerHTML = `
+  <div class="ki-dialog" role="dialog" aria-modal="true" aria-labelledby="ex-title" tabindex="-1">
+    <h2 class="ki-title" id="ex-title">Beitrag exportieren</h2>
+    <p class="ki-text">Was möchtest du exportieren?</p>
+    <p class="fb-ctx" hidden></p>
+    <div class="ki-options" role="radiogroup" aria-label="Export-Art">
+      ${EXPORT_ARTEN.map(a => `
+      <button class="ki-option" type="button" role="radio" aria-checked="false" data-id="${esc(a.id)}">
+        <span class="ki-name">${esc(a.name)}<small></small></span>
+        <span class="ki-radio" aria-hidden="true"></span>
+      </button>`).join('')}
+    </div>
+    <button class="ki-go ex-go" type="button" aria-disabled="true">Exportieren</button>
+    <button class="ki-cancel" type="button">Abbrechen</button>
+  </div>`;
+document.body.appendChild(exEl);
+
+const exDialog = exEl.querySelector('.ki-dialog');
+const exCtxEl = exEl.querySelector('.fb-ctx');
+const exGoEl = exEl.querySelector('.ex-go');
+let exOpener = null, exFo = null, exArt = null, exBusy = false;
+
+function exSelect(id) {
+  exArt = EXPORT_ARTEN.find(a => a.id === id) || null;
+  exEl.querySelectorAll('.ki-option').forEach(b => b.setAttribute('aria-checked', String(!!exArt && b.dataset.id === exArt.id)));
+  if (exArt) exGoEl.removeAttribute('aria-disabled'); else exGoEl.setAttribute('aria-disabled', 'true');
+  if (exArt && exArt.bild) exDatei(exArt.bild(exFo));   // Datei schon jetzt laden
+}
+function exOpen(opener) {
+  const f = forderungVon(opener);
+  if (!f) return;
+  exOpener = opener; exFo = f; exBusy = false;
+  exCtxEl.textContent = 'Aktueller Beitrag:\n' + klartext(f.head);
+  exCtxEl.hidden = false;
+  exEl.querySelectorAll('.ki-option small').forEach((el, i) => { el.textContent = EXPORT_ARTEN[i].info(f); });
+  exSelect(null);   // bei jedem Öffnen ohne Vorauswahl
+  exEl.classList.add('open');
+  document.documentElement.style.overflow = 'hidden';   // Seite dahinter nicht scrollbar
+  appEl.inert = true;
+  exDialog.focus();
+}
+function exClose() {
+  exEl.classList.remove('open');
+  document.documentElement.style.overflow = '';
+  appEl.inert = false;
+  if (exOpener) exOpener.focus();
+}
+async function exGo() {
+  if (!exArt || !exFo || exBusy) return;
+  exBusy = true;
+  try {
+    const fertig = exArt.text ? await exportiereText(exArt.text(exFo)) : await exportiereBild(exArt.bild(exFo));
+    if (fertig) exClose();
+  } finally {
+    exBusy = false;
+  }
+}
+
+exEl.addEventListener('click', e => {
+  if (e.target === exEl || e.target.closest('.ki-cancel')) return exClose();   // Tipp auf den Hintergrund oder „Abbrechen“
+  const opt = e.target.closest('.ki-option');
+  if (opt) return exSelect(opt.dataset.id);
+  if (e.target.closest('.ex-go')) exGo();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && exEl.classList.contains('open')) exClose();
+});
 /* =====================  Gefällt mir (Herzen)  =====================
    Tipp auf das Herz (1200.svg) wechselt zu 1200-aktiv.svg und spielt die Animation ab.
    Gezählt wird global über einen Cloudflare Worker (Ordner herzen-worker): Der Server zählt.
@@ -881,7 +1016,8 @@ paintHearts();   // sofort mit den zuletzt bekannten Zahlen
 loadHearts();
 
 document.getElementById('feed').addEventListener('click', e => {
-  if (e.target.closest('[data-action="share"]')) share();
+  const exp = e.target.closest('[data-action="share"]');
+  if (exp) exOpen(exp);
   const like = e.target.closest('[data-action="like"]');
   if (like) toggleLike(like);
 });
