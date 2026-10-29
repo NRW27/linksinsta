@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Feed</title>
+<style>
+  /* Alle Maße in cqw (1cqw = 1 % der App-Breite), abgeleitet vom Screenshot (1280 px breit = 100cqw) */
+  /* Schriften (lokal, Ordner fonts/): Inter für Fließtext und Oberfläche, Work Sans Black für die plakative Forderung */
+  @font-face { font-family: "Inter"; font-weight: 400; font-style: normal; font-display: swap; src: url("fonts/Inter-Regular.ttf") format("truetype"); }
+  @font-face { font-family: "Inter"; font-weight: 400; font-style: italic; font-display: swap; src: url("fonts/Inter-Italic.ttf") format("truetype"); }
+  @font-face { font-family: "Inter"; font-weight: 500; font-style: normal; font-display: swap; src: url("fonts/Inter-Medium.ttf") format("truetype"); }
+  @font-face { font-family: "Inter"; font-weight: 700; font-style: normal; font-display: swap; src: url("fonts/Inter-Bold.ttf") format("truetype"); }
+  @font-face { font-family: "Work Sans"; font-weight: 300; font-style: normal; font-display: swap; src: url("fonts/WorkSans-Light.ttf") format("truetype"); }
+  @font-face { font-family: "Work Sans"; font-weight: 400; font-style: normal; font-display: swap; src: url("fonts/WorkSans-Regular.ttf") format("truetype"); }
+  @font-face { font-family: "Work Sans"; font-weight: 900; font-style: normal; font-display: swap; src: url("fonts/WorkSans-Black.ttf") format("truetype"); }
+
+  :root {
+    --font-text: "Inter", sans-serif;
+    --font-head: "Work Sans", sans-serif;
+    --body-size: 4.94cqw;    /* feste Schriftgröße der ergänzenden Erklärung (1cqw = 1 % der App-Breite) */
+    --body-font: var(--font-head);   /* Schrift der Erklärung; Rückbau auf die alte Optik: var(--font-text) mit --body-weight 500 und --em-weight 700 */
+    --body-weight: 300;      /* Grundschrift der Erklärung: dünn (Work Sans Light) */
+    --em-weight: 900;        /* hervorgehobene Wörter (**Wort** in forderungen.js): fett (Work Sans Black) */
+    --text: #262626;
+    --accent: #5a67e6;      /* aktiver Punkt */
+    --dot: #d2d2d8;        /* inaktive Punkte */
+    --placeholder: #b960dd; /* Platzhalterfarbe, solange ein Beitragsbild lädt */
+    --dim: 0.3;             /* Abdunklung aller Beitragsbilder (0.3 = 30 %) */
+    --verlauf-start: 30%;   /* Höhe im Bild (von oben), ab der der Rot-Verlauf beginnt */
+    --verlauf-ende: 100%;   /* Höhe im Bild (von oben), an der das Bild vollständig in #FF0000 übergegangen ist */
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: #f2f2f2; }
+  body {
+    color: var(--text);
+    font-family: var(--font-text);
+    -webkit-text-size-adjust: 100%;
+  }
+  .app {
+    width: min(100%, 480px);
+    min-height: 100dvh;
+    margin: 0 auto;
+    background: #fff;
+    container-type: inline-size;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  img { display: block; -webkit-user-drag: none; user-select: none; }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+
+  /* ---------- Header: Karussell mit runden Icons ---------- */
+  .stories {
+    position: relative;
+    display: flex;
+    gap: 3.05cqw;
+    padding: 2.2cqw 2.35cqw 1.6cqw;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .stories::-webkit-scrollbar { display: none; }
+  .story { display: block; flex: 0 0 24.2cqw; width: 24.2cqw; text-align: center; color: inherit; text-decoration: none; -webkit-touch-callout: none; }
+  .story-ring {
+    width: 24.2cqw; aspect-ratio: 1; border-radius: 50%;
+    padding: 0.7cqw;
+    background: linear-gradient(40deg, #f9c931 5%, #f2832b 25%, #e8326a 52%, #c52bc0 78%);
+  }
+  .story-gap { width: 100%; height: 100%; border-radius: 50%; background: #fff; padding: 1.1cqw; }
+  .story-gap img {
+    width: 100%; height: 100%; border-radius: 50%; object-fit: cover;
+    background: #e6e6ea; box-shadow: 0 0 0 0.15cqw #dcdcdc;
+  }
+  .story-name {
+    margin-top: 0.6cqw;
+    font-size: 2.65cqw; line-height: 3.4cqw;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* ---------- Beitrag ---------- */
+  .post { padding-bottom: 5cqw; }
+  .post-head {
+    height: 13.5cqw; padding: 0 3.75cqw;
+    display: flex; align-items: center; gap: 3.1cqw;
+  }
+  .post-avatar-link { display: block; flex: none; border-radius: 50%; line-height: 0; }
+  .post-avatar {
+    width: 7.65cqw; height: 7.65cqw; border-radius: 50%; object-fit: cover;
+    background: #e9e4c4; box-shadow: 0 0 0 0.15cqw #ddd8b8;
+  }
+  .post-user { font-size: 3.1cqw; font-weight: 500; letter-spacing: 0.01em; }
+
+  .slider {
+    display: flex;
+    aspect-ratio: 4 / 5;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    background: var(--placeholder);
+  }
+  .slider::-webkit-scrollbar { display: none; }
+  .slide {
+    flex: 0 0 100%; height: 100%;
+    scroll-snap-align: start; scroll-snap-stop: always;
+    overflow: hidden; background: var(--placeholder); position: relative;
+  }
+  .slide img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* Abdunklung + Verlauf + Text auf dem Bild (liegen über dem Bild, bleiben beim Bildwechsel-Zoom ruhig)
+     Verlauf: am Anfang der Richtung ist das Bild unverändert, zum Ende hin geht es stufenlos in #FF0000 über (#ff000000 = dasselbe Rot, voll durchsichtig).
+     Die Richtung steht pro Bild im Attribut data-verlauf; gesetzt wird es aus der Tabelle VERLAUF (Skript, Abschnitt „Konfiguration“), ohne Eintrag gilt oben-unten. Die acht Modi:
+       links-rechts  rechts-links  unten-oben  oben-unten
+       ecke-lo-ru (links oben → rechts unten)  ecke-ro-lu (rechts oben → links unten)
+       ecke-lu-ro (links unten → rechts oben)  ecke-ru-lo (rechts unten → links oben) */
+  .slide { --verlauf-richtung: to bottom; --schatten-x: 0; --schatten-y: 1; --schatten-dir: 1; }   /* --schatten-dir: 1 = Schatten fällt zum Rot hin, -1 = vom Rot weg; gilt für Forderung und fette Wörter */
+  .slide[data-verlauf="links-rechts"] { --verlauf-richtung: to right; --schatten-x: 1; --schatten-y: 0; }
+  .slide[data-verlauf="rechts-links"] { --verlauf-richtung: to left; --schatten-x: -1; --schatten-y: 0; }
+  .slide[data-verlauf="unten-oben"]   { --verlauf-richtung: to top; --schatten-x: 0; --schatten-y: -1; }
+  .slide[data-verlauf="oben-unten"]   { --verlauf-richtung: to bottom; --schatten-x: 0; --schatten-y: 1; }
+  .slide[data-verlauf="ecke-lo-ru"]   { --verlauf-richtung: 135deg; --schatten-x: 0.707; --schatten-y: 0.707; }   /* fester 45°-Winkel: „to bottom right“ wäre im 4:5-Format zu steil und sähe fast wie links-rechts aus */
+  .slide[data-verlauf="ecke-ro-lu"]   { --verlauf-richtung: 225deg; --schatten-x: -0.707; --schatten-y: 0.707; }
+  .slide[data-verlauf="ecke-lu-ro"]   { --verlauf-richtung: 45deg; --schatten-x: 0.707; --schatten-y: -0.707; }    /* links unten → rechts oben */
+  .slide[data-verlauf="ecke-ru-lo"]   { --verlauf-richtung: 315deg; --schatten-x: -0.707; --schatten-y: -0.707; }   /* rechts unten → links oben */
+  .slide::after {
+    content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background:
+      linear-gradient(var(--verlauf-richtung), #ff000000 var(--verlauf-start), #ff0000 var(--verlauf-ende)),
+      rgb(0 0 0 / var(--dim));
+  }
+  .overlay { position: absolute; inset: 0; z-index: 2; color: #fff; text-align: center; pointer-events: none; }
+  /* Zwei Textzonen: Forderung am unteren Rand des oberen Drittels, Erklärung am oberen Rand der unteren Hälfte des Bildes (so nah wie möglich beieinander) */
+  .zone {
+    position: absolute; left: 5cqw; right: 5cqw;   /* 5cqw = PAD im Skript */
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .zone-head { top: 0; height: calc(33.333% + 10%); justify-content: flex-end; }   /* Forderung: 10 % der Bildhöhe tiefer */
+  .zone-body { bottom: 0; min-height: calc(50% - 5%); padding-bottom: 3cqw; justify-content: flex-start; }   /* Erklärung: 5 % der Bildhöhe tiefer; wächst bei sehr langen Texten nach oben, statt unten abgeschnitten zu werden */
+  /* Schatten der plakativen Forderung: Richtung je Bild aus data-verlauf (--schatten-x/-y/-dir, siehe .slide oben), Größe in em, skaliert also mit der eingepassten Schriftgröße.
+     Drei Lagen: harte dunkelrote Kante (plakativer Versatz), weicher Schlagschatten, schwaches Umfeld für Lesbarkeit auf hellen Bildstellen. */
+  .head {
+    width: max-content; margin: 0; font-family: var(--font-head); font-weight: 900; line-height: 1.08; letter-spacing: -0.01em; white-space: nowrap;
+    text-shadow:
+      calc(var(--schatten-x) * var(--schatten-dir) * 0.045em) calc(var(--schatten-y) * var(--schatten-dir) * 0.045em) 0 rgb(75 0 0 / 0.6),
+      calc(var(--schatten-x) * var(--schatten-dir) * 0.10em)  calc(var(--schatten-y) * var(--schatten-dir) * 0.10em)  0.14em rgb(0 0 0 / 0.45),
+      0 0 0.32em rgb(0 0 0 / 0.3);
+  }
+  .body { width: 100%; margin: 0; font-family: var(--body-font); font-size: var(--body-size); font-weight: var(--body-weight); line-height: 1.3;   /* bricht automatisch um */
+    text-shadow: 0 0.05em 0.35em rgb(0 0 0 / 0.35); }   /* dezenter Schatten für die dünne Grundschrift */
+  /* Fett gesetzte Wörter (Markierung **Wort** im Text): gleicher Schatten wie die Forderung, Richtung folgt dem Verlauf des Bildes */
+  .body strong {
+    font-weight: var(--em-weight);
+    text-shadow:
+      calc(var(--schatten-x) * var(--schatten-dir) * 0.05em) calc(var(--schatten-y) * var(--schatten-dir) * 0.05em) 0 rgb(75 0 0 / 0.6),
+      calc(var(--schatten-x) * var(--schatten-dir) * 0.11em) calc(var(--schatten-y) * var(--schatten-dir) * 0.11em) 0.15em rgb(0 0 0 / 0.5),
+      0 0 0.3em rgb(0 0 0 / 0.3);
+  }
+  .ln { display: block; white-space: nowrap; }
+
+  /* Bildwechsel: das neu eingerastete Bild zoomt kurz heran und blendet ein */
+  .slide img.enter { animation: slide-enter 380ms cubic-bezier(.2, .7, .2, 1); }
+  @keyframes slide-enter {
+    from { opacity: 0.35; transform: scale(1.09); }
+    to   { opacity: 1;    transform: scale(1); }
+  }
+
+  .dots {
+    display: flex; justify-content: center; gap: 0.95cqw;
+    padding-top: 3cqw;
+  }
+  .dot {
+    width: 1.2cqw; height: 1.2cqw; border-radius: 50%;
+    background: var(--dot);
+    transition: background-color 200ms ease, transform 200ms ease;
+  }
+  .dot.active { background: var(--accent); transform: scale(1.1); }
+
+  .actions {
+    margin-top: 2.1cqw;
+    padding: 0 3.75cqw 0 3.1cqw;
+    display: flex; align-items: center; gap: 3.6cqw;
+  }
+  .act { position: relative; display: flex; align-items: center; gap: 1.25cqw; }
+  .act img { width: 5.9cqw; height: 5.9cqw; object-fit: contain; }
+  .act-count { font-size: 3.3cqw; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .act:active { transform: scale(0.92); }
+  .act.save { margin-left: auto; }
+
+  /* „Gefällt mir“: Herz springt kurz auf, dazu Ring und sechs Funken in derselben Farbe wie 1200-aktiv.svg */
+  .act.like img { transform-origin: 50% 55%; }
+  .act.like.pop img { animation: heart-pop 520ms cubic-bezier(0.2, 0.8, 0.3, 1) both; }
+  .act.like.unpop img { animation: heart-off 220ms ease-out both; }
+  @keyframes heart-pop {
+    0%   { transform: scale(0.55); }
+    35%  { transform: scale(1.38); }
+    60%  { transform: scale(0.9); }
+    80%  { transform: scale(1.08); }
+    100% { transform: scale(1); }
+  }
+  @keyframes heart-off { 0% { transform: scale(0.8); } 100% { transform: scale(1); } }
+  .heart-burst { position: absolute; width: 0; height: 0; pointer-events: none; }
+  .heart-burst::before {   /* Ring */
+    content: ''; position: absolute; left: -3cqw; top: -3cqw; width: 6cqw; height: 6cqw; box-sizing: border-box;
+    border: 0.5cqw solid #ed4956; border-radius: 50%; opacity: 0;
+    animation: heart-ring 480ms ease-out forwards;
+  }
+  @keyframes heart-ring { 0% { transform: scale(0.35); opacity: 0.85; } 100% { transform: scale(1.25); opacity: 0; } }
+  .heart-burst i {         /* Funken */
+    position: absolute; left: -0.55cqw; top: -0.55cqw; width: 1.1cqw; height: 1.1cqw; border-radius: 50%;
+    background: #ed4956; opacity: 0;
+    animation: heart-spark 520ms cubic-bezier(0.15, 0.7, 0.3, 1) 60ms forwards;
+  }
+  .heart-burst i:nth-child(odd) { background: #ff8a95; }
+  @keyframes heart-spark {
+    0%   { opacity: 1; transform: rotate(var(--a)) translateY(-2.6cqw) scale(1); }
+    100% { opacity: 0; transform: rotate(var(--a)) translateY(-5cqw) scale(0.3); }
+  }
+
+  /* Diagnose-Hinweis bei fehlenden Bildern (später zusammen mit dem Diagnose-Skript entfernen) */
+  .diag {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 99;
+    width: min(100%, 480px); margin: 0 auto; padding: 10px 14px;
+    background: #b00020; color: #fff;
+    font: 12px/1.4 var(--font-text); white-space: pre-wrap; word-break: break-all;
+  }
+
+  /* Kurzer Hinweis (z. B. „Link kopiert“), wenn das Teilen-Menü nicht verfügbar ist */
+  .toast {
+    position: fixed; left: 50%; bottom: 6vh; z-index: 98;
+    transform: translateX(-50%);
+    width: max-content; max-width: calc(100vw - 32px); text-align: center;
+    padding: 10px 16px; border-radius: 20px;
+    background: #262626; color: #fff;
+    font: 500 13px/1.3 var(--font-text);
+    opacity: 0; pointer-events: none;
+    transition: opacity 200ms ease;
+  }
+  .toast.show { opacity: 1; }
+
+  /* ---------- KI-Overlay (Symbol 1204.svg): weichzeichnet alles dahinter, Auswahl mittig ----------
+     Liegt direkt im <body> (nicht in .app), weil .app per container-type fixierte Elemente sonst an sich bindet. */
+  .ki-overlay {
+    position: fixed; inset: 0; z-index: 90;
+    display: flex; align-items: center; justify-content: center;
+    padding: max(20px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) max(20px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px));
+    background: rgb(20 20 32 / 0.3);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);   /* Stärke des Weichzeichners */
+    overscroll-behavior: contain;
+    opacity: 0; visibility: hidden;
+    transition: opacity 200ms ease, visibility 0s linear 200ms;
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .ki-overlay { background: rgb(20 20 32 / 0.8); }   /* Ersatz ohne Blur-Unterstützung */
+  }
+  .ki-overlay.open { opacity: 1; visibility: visible; transition: opacity 200ms ease; }
+  .ki-dialog {
+    width: min(100%, 400px); max-height: 100%; overflow-y: auto;
+    padding: 22px 20px 12px; border-radius: 20px;
+    background: #fff; color: var(--text);
+    box-shadow: 0 12px 40px rgb(0 0 0 / 0.3);
+    transform: scale(0.96); transition: transform 200ms ease;
+    outline: none;
+  }
+  .ki-overlay.open .ki-dialog { transform: none; }
+  .ki-title { margin: 0 0 8px; font-size: 19px; line-height: 1.25; font-weight: 700; }
+  .ki-text { margin: 0; font-size: 14px; line-height: 1.45; color: #555; }
+  .ki-options { display: grid; gap: 10px; margin: 18px 0 14px; }
+  .ki-option {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    width: 100%; padding: 13px 16px; text-align: left;
+    border: 2px solid #e4e4ea; border-radius: 14px; background: #fff;
+    transition: border-color 150ms ease, background-color 150ms ease;
+  }
+  .ki-option:active { transform: scale(0.98); }
+  .ki-option[aria-checked="true"] { border-color: var(--accent); background: #f1f2fe; }
+  .ki-name { font-size: 17px; font-weight: 500; line-height: 1.2; }
+  .ki-name small { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: #777; }
+  .ki-radio { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--dot); background: #fff; }
+  .ki-option[aria-checked="true"] .ki-radio { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 0 5px, #fff 5.5px); }
+  .ki-hint { margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; background: #fff4d6; color: #6b4e00; font-size: 13px; line-height: 1.4; }
+  .ki-go { display: block; padding: 14px 16px; border-radius: 14px; background: var(--accent); color: #fff; font-size: 16px; font-weight: 700; text-align: center; text-decoration: none; }
+  .ki-go[aria-disabled="true"] { background: #e4e4ea; color: #8a8a94; pointer-events: none; }
+  .ki-cancel { display: block; width: 100%; margin-top: 4px; padding: 12px; font-size: 14px; color: #777; }
+
+  /* ---------- Feedback-Dialog (Symbol 1202.svg): nutzt Overlay und Dialog des KI-Fensters ---------- */
+  .fb-field { display: block; width: 100%; margin-top: 10px; padding: 12px 14px; font: inherit; font-size: 16px; color: var(--text); border: 2px solid #e4e4ea; border-radius: 14px; background: #fff; }   /* 16 px: iOS zoomt sonst ins Feld */
+  textarea.fb-field { resize: vertical; min-height: 110px; }
+  .fb-field:focus { outline: none; border-color: var(--accent); }
+  .fb-ctx { margin: 14px 0 0; padding: 8px 12px; border-radius: 10px; background: #f1f2fe; color: #3d46a8; font-size: 13px; line-height: 1.35; white-space: pre-line; }
+  .fb-note { margin: 10px 0 14px; font-size: 12px; line-height: 1.4; color: #777; }
+  .fb-trap { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }   /* Honeypot gegen Spam-Bots */
+  .fb-send { width: 100%; }
+  .fb-send:disabled { opacity: 0.6; pointer-events: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .slide img.enter { animation: none; }
+    .dot { transition: none; }
+    .ki-overlay, .ki-dialog { transition: none; }
+    .act.like.pop img, .act.like.unpop img { animation: none; }
+    .heart-burst { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<main class="app" id="app">
+  <section class="stories" id="stories" aria-label="Stories"></section>
+  <div id="feed"></div>
+</main>
+
+<script src="forderungen.js"></script>
+<script src="feed-order.js"></script>
+<script src="herz-start.js"></script>
+
+<script>
+/* Diagnose: meldet Bilder, die nicht geladen werden konnten (später entfernen) */
+(() => {
+  const missing = new Set();
+  let box, firstUrl;
+  document.addEventListener('error', e => {
+    if (!(e.target instanceof HTMLImageElement)) return;
+    missing.add(e.target.getAttribute('src'));
+    firstUrl = firstUrl || e.target.src;
+    if (!box) { box = document.createElement('div'); box.className = 'diag'; document.body.appendChild(box); }
+    box.textContent = 'Nicht gefunden: ' + [...missing].join(', ') +
+      '\nGesucht unter: ' + firstUrl +
+      '\nSeite geöffnet über: ' + location.protocol;
+  }, true);
+})();
+
+/* =====================  Konfiguration (hier später echte Daten eintragen)  ===================== */
+
+// 18 Story-Einträge: Bild, Name (Caption) und Instagram-Profil (ohne @). Klick öffnet das Profil.
+const STORIES = [
+  { img: '1101.jpg', name: 'Die Linke NRW',            handle: 'dielinkenrw' },
+  { img: '1102.jpg', name: 'Alexandra Mehdi',          handle: 'alexandramehdi' },
+  { img: '1103.jpg', name: 'Sebastian Merkens',        handle: 'sebastian_merkens' },
+  { img: '1104.jpg', name: 'Sonja Baumann',            handle: 'dielinkesonja' },
+  { img: '1105.jpg', name: 'Nils Böhlke',              handle: 'nilsboehlke' },
+  { img: '1106.jpg', name: 'Sarah Niknamtavin',        handle: 'kampfundkajal' },
+  { img: '1107.jpg', name: 'Batıkağan Pulat',          handle: 'batikaganpulat' },
+  { img: '1108.jpg', name: 'Katharina Grudin',         handle: 'katharina.grudin' },
+  { img: '1109.jpg', name: 'Halil Izci',               handle: 'halil_izci_' },
+  { img: '1110.jpg', name: 'Stephanie Nordmann',       handle: 'stephanie.nordmann_die.linke' },
+  { img: '1111.jpg', name: 'Luisa Reyes',              handle: 'dielinkeluisa' },
+  { img: '1112.jpg', name: 'Stefanie Bilinski',        handle: 'steffi_alfter' },
+  { img: '1113.jpg', name: 'Markus Korporal',          handle: 'korporalundwiese' },
+  { img: '1114.jpg', name: 'Franziska von Neumann',    handle: 'franzi.vonneumann' },
+  { img: '1115.jpg', name: 'Selmar Ibrahimovic',       handle: 'selmar.ibra' },
+  { img: '1116.jpg', name: 'Enrica Harting',           handle: 'dielinke.enrica' },
+  { img: '1117.jpg', name: 'Jacob Bohé',               handle: 'jacobbohe' },
+  { img: '1118.jpg', name: 'Maryam Barry',             handle: 'maryam.macht.politik' },
+];
+
+/* ---------- Verlauf-Effekt je Bild ----------
+   Jedes Beitragsbild (001.jpg bis 180.jpg) hat einen eigenen Eintrag und lässt sich einzeln steuern: einfach den Modus in der Zeile ändern.
+   Modi (Rot, #FF0000, liegt am Ende der genannten Richtung; Darstellung siehe .slide[data-verlauf] im CSS):
+     'links-rechts'  'rechts-links'  'unten-oben'  'oben-unten'
+     'ecke-lo-ru' (links oben → rechts unten)   'ecke-ro-lu' (rechts oben → links unten)
+     'ecke-lu-ro' (links unten → rechts oben)   'ecke-ru-lo' (rechts unten → links oben)
+   Die Verteilung wurde einmal zufällig (gleichmäßig auf alle acht Modi) erzeugt und bleibt jetzt fest.
+   Ein Bild ohne Eintrag bekommt VERLAUF_STANDARD. */
+const VERLAUF_MODI = ['links-rechts', 'rechts-links', 'unten-oben', 'oben-unten', 'ecke-lo-ru', 'ecke-ro-lu', 'ecke-lu-ro', 'ecke-ru-lo'];
+const VERLAUF_STANDARD = 'oben-unten';
+const VERLAUF = {
+  // 001 – 010
+  '001.jpg': 'ecke-ro-lu',
+  '002.jpg': 'ecke-ro-lu',
+  '003.jpg': 'ecke-lo-ru',
+  '004.jpg': 'links-rechts',
+  '005.jpg': 'ecke-ru-lo',
+  '006.jpg': 'ecke-ro-lu',
+  '007.jpg': 'ecke-lo-ru',
+  '008.jpg': 'ecke-ru-lo',
+  '009.jpg': 'rechts-links',
+  '010.jpg': 'unten-oben',
+  // 011 – 020
+  '011.jpg': 'ecke-ru-lo',
+  '012.jpg': 'ecke-lo-ru',
+  '013.jpg': 'ecke-ru-lo',
+  '014.jpg': 'ecke-ro-lu',
+  '015.jpg': 'rechts-links',
+  '016.jpg': 'unten-oben',
+  '017.jpg': 'ecke-lo-ru',
+  '018.jpg': 'rechts-links',
+  '019.jpg': 'ecke-ro-lu',
+  '020.jpg': 'unten-oben',
+  // 021 – 030
+  '021.jpg': 'oben-unten',
+  '022.jpg': 'rechts-links',
+  '023.jpg': 'ecke-ru-lo',
+  '024.jpg': 'ecke-lu-ro',
+  '025.jpg': 'ecke-ru-lo',
+  '026.jpg': 'ecke-lu-ro',
+  '027.jpg': 'ecke-lo-ru',
+  '028.jpg': 'unten-oben',
+  '029.jpg': 'ecke-ru-lo',
+  '030.jpg': 'ecke-ro-lu',
+  // 031 – 040
+  '031.jpg': 'oben-unten',
+  '032.jpg': 'links-rechts',
+  '033.jpg': 'unten-oben',
+  '034.jpg': 'oben-unten',
+  '035.jpg': 'ecke-lu-ro',
+  '036.jpg': 'ecke-ro-lu',
+  '037.jpg': 'links-rechts',
+  '038.jpg': 'ecke-ru-lo',
+  '039.jpg': 'rechts-links',
+  '040.jpg': 'unten-oben',
+  // 041 – 050
+  '041.jpg': 'links-rechts',
+  '042.jpg': 'oben-unten',
+  '043.jpg': 'rechts-links',
+  '044.jpg': 'oben-unten',
+  '045.jpg': 'ecke-ro-lu',
+  '046.jpg': 'unten-oben',
+  '047.jpg': 'unten-oben',
+  '048.jpg': 'ecke-ro-lu',
+  '049.jpg': 'ecke-lo-ru',
+  '050.jpg': 'rechts-links',
+  // 051 – 060
+  '051.jpg': 'ecke-ro-lu',
+  '052.jpg': 'oben-unten',
+  '053.jpg': 'ecke-ru-lo',
+  '054.jpg': 'links-rechts',
+  '055.jpg': 'links-rechts',
+  '056.jpg': 'unten-oben',
+  '057.jpg': 'ecke-lo-ru',
+  '058.jpg': 'ecke-ro-lu',
+  '059.jpg': 'links-rechts',
+  '060.jpg': 'ecke-lo-ru',
+  // 061 – 070
+  '061.jpg': 'unten-oben',
+  '062.jpg': 'oben-unten',
+  '063.jpg': 'unten-oben',
+  '064.jpg': 'ecke-lu-ro',
+  '065.jpg': 'ecke-ru-lo',
+  '066.jpg': 'ecke-ru-lo',
+  '067.jpg': 'ecke-ro-lu',
+  '068.jpg': 'ecke-lo-ru',
+  '069.jpg': 'ecke-lo-ru',
+  '070.jpg': 'rechts-links',
+  // 071 – 080
+  '071.jpg': 'oben-unten',
+  '072.jpg': 'unten-oben',
+  '073.jpg': 'oben-unten',
+  '074.jpg': 'rechts-links',
+  '075.jpg': 'ecke-lo-ru',
+  '076.jpg': 'ecke-lu-ro',
+  '077.jpg': 'ecke-lu-ro',
+  '078.jpg': 'unten-oben',
+  '079.jpg': 'oben-unten',
+  '080.jpg': 'ecke-ru-lo',
+  // 081 – 090
+  '081.jpg': 'oben-unten',
+  '082.jpg': 'links-rechts',
+  '083.jpg': 'unten-oben',
+  '084.jpg': 'oben-unten',
+  '085.jpg': 'ecke-ro-lu',
+  '086.jpg': 'ecke-ro-lu',
+  '087.jpg': 'oben-unten',
+  '088.jpg': 'ecke-lo-ru',
+  '089.jpg': 'ecke-ro-lu',
+  '090.jpg': 'ecke-ru-lo',
+  // 091 – 100
+  '091.jpg': 'rechts-links',
+  '092.jpg': 'unten-oben',
+  '093.jpg': 'ecke-lu-ro',
+  '094.jpg': 'links-rechts',
+  '095.jpg': 'links-rechts',
+  '096.jpg': 'oben-unten',
+  '097.jpg': 'rechts-links',
+  '098.jpg': 'rechts-links',
+  '099.jpg': 'oben-unten',
+  '100.jpg': 'links-rechts',
+  // 101 – 110
+  '101.jpg': 'ecke-lo-ru',
+  '102.jpg': 'ecke-lo-ru',
+  '103.jpg': 'ecke-lu-ro',
+  '104.jpg': 'unten-oben',
+  '105.jpg': 'links-rechts',
+  '106.jpg': 'ecke-lo-ru',
+  '107.jpg': 'oben-unten',
+  '108.jpg': 'ecke-lo-ru',
+  '109.jpg': 'links-rechts',
+  '110.jpg': 'links-rechts',
+  // 111 – 120
+  '111.jpg': 'ecke-ru-lo',
+  '112.jpg': 'oben-unten',
+  '113.jpg': 'ecke-lu-ro',
+  '114.jpg': 'ecke-lu-ro',
+  '115.jpg': 'ecke-lo-ru',
+  '116.jpg': 'oben-unten',
+  '117.jpg': 'ecke-ro-lu',
+  '118.jpg': 'ecke-lu-ro',
+  '119.jpg': 'links-rechts',
+  '120.jpg': 'ecke-ro-lu',
+  // 121 – 130
+  '121.jpg': 'links-rechts',
+  '122.jpg': 'ecke-lo-ru',
+  '123.jpg': 'links-rechts',
+  '124.jpg': 'ecke-ru-lo',
+  '125.jpg': 'ecke-lu-ro',
+  '126.jpg': 'ecke-lu-ro',
+  '127.jpg': 'unten-oben',
+  '128.jpg': 'rechts-links',
+  '129.jpg': 'unten-oben',
+  '130.jpg': 'ecke-ro-lu',
+  // 131 – 140
+  '131.jpg': 'ecke-lu-ro',
+  '132.jpg': 'ecke-lu-ro',
+  '133.jpg': 'unten-oben',
+  '134.jpg': 'unten-oben',
+  '135.jpg': 'ecke-ro-lu',
+  '136.jpg': 'rechts-links',
+  '137.jpg': 'ecke-lu-ro',
+  '138.jpg': 'unten-oben',
+  '139.jpg': 'rechts-links',
+  '140.jpg': 'oben-unten',
+  // 141 – 150
+  '141.jpg': 'ecke-ru-lo',
+  '142.jpg': 'rechts-links',
+  '143.jpg': 'ecke-ru-lo',
+  '144.jpg': 'links-rechts',
+  '145.jpg': 'ecke-ru-lo',
+  '146.jpg': 'ecke-ru-lo',
+  '147.jpg': 'rechts-links',
+  '148.jpg': 'rechts-links',
+  '149.jpg': 'ecke-lo-ru',
+  '150.jpg': 'ecke-ro-lu',
+  // 151 – 160
+  '151.jpg': 'links-rechts',
+  '152.jpg': 'links-rechts',
+  '153.jpg': 'ecke-lu-ro',
+  '154.jpg': 'links-rechts',
+  '155.jpg': 'unten-oben',
+  '156.jpg': 'rechts-links',
+  '157.jpg': 'ecke-lo-ru',
+  '158.jpg': 'ecke-lu-ro',
+  '159.jpg': 'rechts-links',
+  '160.jpg': 'rechts-links',
+  // 161 – 170
+  '161.jpg': 'ecke-ro-lu',
+  '162.jpg': 'ecke-ru-lo',
+  '163.jpg': 'oben-unten',
+  '164.jpg': 'ecke-lo-ru',
+  '165.jpg': 'rechts-links',
+  '166.jpg': 'ecke-lu-ro',
+  '167.jpg': 'ecke-ro-lu',
+  '168.jpg': 'links-rechts',
+  '169.jpg': 'rechts-links',
+  '170.jpg': 'oben-unten',
+  // 171 – 180
+  '171.jpg': 'ecke-lu-ro',
+  '172.jpg': 'ecke-lu-ro',
+  '173.jpg': 'links-rechts',
+  '174.jpg': 'ecke-ru-lo',
+  '175.jpg': 'unten-oben',
+  '176.jpg': 'ecke-ru-lo',
+  '177.jpg': 'oben-unten',
+  '178.jpg': 'ecke-lo-ru',
+  '179.jpg': 'ecke-lu-ro',
+  '180.jpg': 'oben-unten',
+};
+const verlaufVon = img => VERLAUF[String(img).split('?')[0].split('/').pop()] || VERLAUF_STANDARD;
+{ // Plausibilitätsprüfung (Meldung nur in der Browser-Konsole)
+  const falsch = Object.entries(VERLAUF).filter(([, m]) => !VERLAUF_MODI.includes(m));
+  if (falsch.length) console.warn('VERLAUF prüfen, unbekannter Modus:', falsch);
+}
+
+// Beiträge: Zuordnung und Reihenfolge kommen aus feed-order.js, Inhalte aus forderungen.js (Pflege über build.py)
+const BY_NR = new Map(FORDERUNGEN.map(f => [f.nr, f]));
+const POSTS = FEED_ORDER.map(nrs => ({
+  id: 'p' + nrs[0],   // stabile ID für den Herzen-Zähler: erste Forderungs-Nummer des Beitrags
+  slides: nrs.map(nr => BY_NR.get(nr)).filter(Boolean),
+  user: 'dielinkenrw',
+  avatar: '1101.jpg',
+  shared: 0,   // Teilen-Klicks für die Reihenfolge (Zählung noch nicht angebunden)
+  actions: [
+    { icon: '1200.svg', iconOn: '1200-aktiv.svg', label: 'Gefällt mir', count: 397, action: 'like' },   // Klick: Herz füllt sich (1200-aktiv.svg), Zahl +1
+    { icon: '1201.svg', label: 'Kommentieren', count: 0, action: 'share' },   // öffnet das Teilen-Menü; angezeigte Zahl = p.shared (siehe Rendering)
+    { icon: '1202.svg', label: 'Feedback senden', action: 'feedback' },   // ohne Zahl; öffnet den Feedback-Dialog
+  ],
+  save: { icon: '1203.svg', label: 'Speichern' },
+  more: { icon: '1204.svg', label: 'KI-Assistent öffnen' },   // fünftes Symbol, rechtsbündig hinter 1203.svg; öffnet das KI-Overlay
+}));
+
+/* Schlüssel des Herzen-Speichers im Browser (Details im Abschnitt „Gefällt mir“ weiter unten) */
+const HK = { token: 'herzen.token', mine: 'herzen.mine', counts: 'herzen.counts' };
+
+// Startwerte: herz-start.js enthält einen Wert je Forderung (Schlüssel 'p' + Nummer der Forderung).
+// Der Startwert eines Beitrags ist der Mittelwert seiner Forderungen, danach über alle Beiträge auf 11 bis 199 gestreckt,
+// damit die Reihenfolge ihre Spannweite behält. Angezeigt wird: Startwert + vom Server gezählte Herzen.
+// Fehlt die Datei, starten alle Beiträge bei 0. Der Zähler selbst gehört dem ganzen Beitrag (ID = 'p' + erste Forderungs-Nummer).
+const START = (() => {
+  const fs = typeof HERZ_START === 'undefined' ? {} : HERZ_START;
+  const mean = p => {
+    const v = p.slides.map(s => fs['p' + s.nr]).filter(x => x != null);
+    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+  };
+  const m = POSTS.map(mean), known = m.filter(x => x != null);
+  const lo = Math.min(...known), hi = Math.max(...known);
+  return Object.fromEntries(POSTS.map((p, i) => [p.id,
+    m[i] == null ? 0 : hi > lo ? Math.round(11 + (m[i] - lo) / (hi - lo) * 188) : Math.round(m[i])]));
+})();
+
+const store = {
+  get: (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+/* =====================  Reihenfolge der Beiträge  =====================
+   Bei jedem Seitenaufruf bekommt jeder Beitrag eine eigene Zufallszahl c (gleichverteilt zwischen 0,5 und 2).
+   Wert = c * (Herzen + 10 * geteilt); die Beiträge werden von groß nach klein sortiert.
+   Herzen = Startwert aus herz-start.js + zuletzt bekannte, vom Server gezählte Herzen (also die Zahl, die unter dem Beitrag steht).
+   Geteilt (p.shared) steht aktuell bei allen Beiträgen auf 0, die Zählung ist noch nicht angebunden.
+   Bei gleichem Wert bleibt die Reihenfolge aus feed-order.js erhalten. */
+const RANK = { cMin: 0.5, cMax: 2, sharedWeight: 10 };
+{
+  const cached = store.get(HK.counts, {}) || {};
+  const randomC = () => RANK.cMin + Math.random() * (RANK.cMax - RANK.cMin);
+  const scored = POSTS.map(p => {
+    p.hearts = (START[p.id] ?? 0) + (Number(cached[p.id]) || 0);
+    return { p, value: randomC() * (p.hearts + RANK.sharedWeight * p.shared) };   // genau ein c je Beitrag
+  });
+  scored.sort((a, b) => b.value - a.value);   // absteigend; Array.sort ist stabil
+  POSTS.splice(0, POSTS.length, ...scored.map(x => x.p));
+}
+
+// Inhalt des Teilen-Menüs (vorläufig ein generischer Link; später z. B. um title/text oder beitragsspezifische Links erweitern)
+const SHARE = { url: 'https://www.dielinke-nrw.de/landesverband/landtagswahl-2027/' };
+
+{ // Plausibilitätsprüfung der Reihenfolge (Meldung nur in der Browser-Konsole)
+  const used = FEED_ORDER.flat();
+  const dup = used.filter((n, i) => used.indexOf(n) !== i);
+  const unknown = used.filter(n => !BY_NR.has(n));
+  const unused = FORDERUNGEN.map(f => f.nr).filter(n => !used.includes(n));
+  if (dup.length || unknown.length || unused.length) console.warn('feed-order.js prüfen:', { doppelt: dup, unbekannt: unknown, nichtVerwendet: unused });
+}
+
+/* =====================  Rendering  ===================== */
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/* ---------- Story-Karussell als Endlos-Loop ----------
+   Die 20 Stories werden mehrfach hintereinander gerendert. Der Inhalt wiederholt sich exakt
+   nach einer festen Breite (W). Nähert man sich einem Rand, wird die Scrollposition unsichtbar
+   um ein Vielfaches von W verschoben – so lässt sich in beide Richtungen endlos scrollen. */
+const STORY_SETS = 5;   // Anzahl der Kopien (ungerade, mindestens 3)
+
+const storiesEl = document.getElementById('stories');
+storiesEl.innerHTML = Array.from({ length: STORY_SETS }, () => STORIES).flat().map(s => `
+  <a class="story" href="https://www.instagram.com/${encodeURIComponent(s.handle)}/" target="_blank" rel="noopener noreferrer" draggable="false" aria-label="${esc(s.name)} auf Instagram öffnen">
+    <div class="story-ring"><div class="story-gap"><img src="${esc(s.img)}" alt="" draggable="false"></div></div>
+    <div class="story-name">${esc(s.name)}</div>
+  </a>`).join('');
+
+(() => {
+  const el = storiesEl;
+  const items = el.querySelectorAll('.story');
+  const n = STORIES.length;
+  const mid = Math.floor(STORY_SETS / 2);
+  let W = 0, timer = 0, touching = false;
+
+  const measure = () => { W = items[n].offsetLeft - items[0].offsetLeft; };   // Breite einer Kopie
+  const wrap = x => W * mid + ((((x - W * mid) % W) + W) % W);               // x in die mittlere Kopie falten
+
+  // Direkt umspringen, falls ein Rand fast erreicht ist (z. B. bei schnellem Wischen)
+  const guard = () => {
+    const x = el.scrollLeft, max = el.scrollWidth - el.clientWidth;
+    if (x < W * 0.5) el.scrollLeft = x + W * mid;
+    else if (x > max - W * 0.5) el.scrollLeft = x - W * mid;
+  };
+
+  // Wenn Ruhe herrscht: zurück in die Mitte, damit immer weit genug Platz in beide Richtungen bleibt
+  const recenter = () => {
+    const x = el.scrollLeft, nx = wrap(x);
+    if (Math.abs(nx - x) > 1) el.scrollLeft = nx;
+  };
+  const schedule = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => { if (!touching) recenter(); }, 150);
+  };
+
+  el.addEventListener('scroll', () => { guard(); schedule(); }, { passive: true });
+  el.addEventListener('touchstart', () => { touching = true; }, { passive: true });
+  const release = () => { touching = false; schedule(); };
+  el.addEventListener('touchend', release, { passive: true });
+  el.addEventListener('touchcancel', release, { passive: true });
+
+  // Bei Größenänderung (Drehen, Fenster) die Position innerhalb der Wiederholung beibehalten
+  window.addEventListener('resize', () => {
+    const phase = W ? ((((el.scrollLeft - W * mid) % W) + W) % W) / W : 0;
+    measure();
+    el.scrollLeft = W * mid + phase * W;
+  });
+
+  measure();
+  el.scrollLeft = W * mid;   // Start: erste Story der mittleren Kopie ganz links
+})();
+
+/* ---------- Text auf den Bildern ----------
+   Alle Größen in cqw (1 % der App-Breite). */
+const PAD = 5;               // seitlicher Rand der Textfläche (muss zum .overlay-Padding passen)
+const HEAD_MAX = 14.3;        // größte erlaubte Schriftgröße der Forderung (zweizeilig)
+const HEAD_LINES = 2;        // Forderung: immer zweizeilig
+const SEMI_BONUS = 10;       // Strichpunkt gilt als bevorzugte Umbruchstelle, wenn er bis ca. 10 Zeichen neben dem Ideal liegt
+
+// Text in genau n möglichst gleich lange Zeilen teilen (nur an Leerzeichen; Optimierung per Dynamischer Programmierung)
+function splitLines(t, n) {
+  t = t.replace(/(\d) (?=\S)/g, '$1\u00A0');   // „16 Euro“ nicht trennen
+  const words = t.split(' '), m = words.length;
+  if (m <= n) return [...words, ...Array(n - m).fill('')];
+  const pre = [0];
+  words.forEach(w => pre.push(pre[pre.length - 1] + w.length + 1));
+  const ideal = t.length / n;
+  const cost = (i, j, last) =>
+    (pre[j] - pre[i] - 1 - ideal) ** 2 - (!last && words[j - 1].endsWith(';') ? SEMI_BONUS ** 2 : 0);
+  const dp = Array.from({ length: n + 1 }, () => Array(m + 1).fill(Infinity));
+  const from = Array.from({ length: n + 1 }, () => Array(m + 1).fill(0));
+  dp[0][0] = 0;
+  for (let k = 1; k <= n; k++)
+    for (let j = k; j <= m; j++)
+      for (let i = k - 1; i < j; i++) {
+        const c = dp[k - 1][i] + cost(i, j, k === n);
+        if (c < dp[k][j]) { dp[k][j] = c; from[k][j] = i; }
+      }
+  const lines = [];
+  for (let k = n, j = m; k >= 1; k--) { const i = from[k][j]; lines.unshift(words.slice(i, j).join(' ')); j = i; }
+  return lines;
+}
+const bodyText = t => t
+  .replace(/(\d) (?=\S)/g, '$1\u00A0')       // „16 Euro“ nicht trennen
+  .replace(/ (?=\S+$)/, '\u00A0');            // letzte zwei Wörter zusammenhalten: nie bricht es vor dem letzten Wort
+const bodyHTML = t => esc(bodyText(t)).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');   // **Wort** wird fett (nach dem Maskieren, einzelne * wie in „Schüler*innen“ bleiben unverändert)
+const linesHTML = (t, n) => splitLines(t, n).map(l => `<span class="ln">${esc(l)}</span>`).join('');
+
+const slideHTML = (f, lazy) => `
+        <div class="slide" data-nr="${esc(f.nr)}" data-verlauf="${esc(verlaufVon(f.img))}">
+          <img src="${esc(f.img)}" alt="" draggable="false" ${lazy ? 'loading="lazy"' : ''} decoding="async">
+          <div class="overlay">
+            <div class="zone zone-head"><div class="head">${linesHTML(f.head, HEAD_LINES)}</div></div>
+            <div class="zone zone-body"><p class="body">${bodyHTML(f.text)}</p></div>
+          </div>
+        </div>`;
+
+document.getElementById('feed').innerHTML = POSTS.map((p, pi) => `
+  <article class="post">
+    <header class="post-head">
+      <a class="post-avatar-link" href="https://www.instagram.com/${encodeURIComponent(p.user)}/" target="_blank" rel="noopener noreferrer" draggable="false" aria-label="${esc(p.user)} auf Instagram öffnen">
+        <img class="post-avatar" src="${esc(p.avatar)}" alt="" draggable="false">
+      </a>
+      <span class="post-user">${esc(p.user)}</span>
+    </header>
+    <div class="slider">
+      ${p.slides.map((f, i) => slideHTML(f, pi || i)).join('')}
+    </div>
+    <div class="dots" aria-hidden="true">
+      ${p.slides.map((_, i) => `<span class="dot${i ? '' : ' active'}"></span>`).join('')}
+    </div>
+    <div class="actions">
+      ${p.actions.map(a => `
+        <button class="act${a.iconOn ? ' like' : ''}" type="button" aria-label="${esc(a.label)}"${a.action ? ` data-action="${esc(a.action)}"` : ''}${a.iconOn ? ` aria-pressed="false" data-post="${esc(p.id)}" data-icon="${esc(a.icon)}" data-icon-on="${esc(a.iconOn)}"` : ''}>
+          <img src="${esc(a.icon)}" alt="">
+          ${(a.action === 'share' ? p.shared : a.count) != null ? `<span class="act-count">${esc(a.action === 'share' ? p.shared : a.count)}</span>` : ''}
+        </button>`).join('')}
+      <button class="act save" type="button" aria-label="${esc(p.save.label)}"><img src="${esc(p.save.icon)}" alt=""></button>
+      <button class="act" type="button" aria-label="${esc(p.more.label)}" aria-haspopup="dialog" data-action="ki"><img src="${esc(p.more.icon)}" alt=""></button>
+    </div>
+  </article>`).join('');
+
+/* =====================  Teilen  =====================
+   Öffnet das systemeigene Teilen-Menü (Web Share API; braucht https und einen Klick/Tipp).
+   Ohne Unterstützung (z. B. viele Desktop-Browser) wird der Link in die Zwischenablage kopiert. */
+const toastEl = document.createElement('div');
+toastEl.className = 'toast';
+toastEl.setAttribute('role', 'status');
+document.body.appendChild(toastEl);
+let toastTimer = 0;
+const toast = msg => {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
+};
+
+async function share() {
+  if (navigator.share) {
+    try { await navigator.share(SHARE); }
+    catch (e) { if (e.name !== 'AbortError') console.warn('Teilen fehlgeschlagen:', e); }   // AbortError = Menü wurde geschlossen
+    return;
+  }
+  try { await navigator.clipboard.writeText(SHARE.url); toast('Link kopiert'); }
+  catch { window.prompt('Link zum Kopieren:', SHARE.url); }
+}
+/* =====================  Gefällt mir (Herzen)  =====================
+   Tipp auf das Herz (1200.svg) wechselt zu 1200-aktiv.svg und spielt die Animation ab.
+   Gezählt wird global über einen Cloudflare Worker (Ordner herzen-worker): Der Server zählt.
+   Der Browser merkt sich nur sein Token (Berechtigung, Herzen zu vergeben) und welche Beiträge
+   er selbst mit einem Herz versehen hat. Ist der Server nicht erreichbar, bleiben die zuletzt
+   bekannten Zahlen stehen und ein Tipp wird zurückgenommen. */
+const HEARTS_API = 'https://herzen.DEIN-NAME.workers.dev';   // Worker unter eigener Domain (Route /api/*): '' eintragen
+
+
+const hearts = { counts: store.get(HK.counts, {}), mine: new Set(store.get(HK.mine, [])), busy: new Set() };
+
+document.querySelectorAll('.act.like').forEach(b => { new Image().src = b.dataset.iconOn; });   // Symbol vorladen, damit beim ersten Tipp nichts flackert
+
+// Zeigt Zustand und Zahl eines Herz-Buttons. animate = true nur direkt nach einem Tipp.
+function paintLike(btn, animate = false) {
+  const id = btn.dataset.post, on = hearts.mine.has(id);
+  const img = btn.querySelector('img');
+  const countEl = btn.querySelector('.act-count');
+  btn.setAttribute('aria-pressed', String(on));
+  const src = on ? btn.dataset.iconOn : btn.dataset.icon;
+  if (img.getAttribute('src') !== src) img.setAttribute('src', src);
+  if (countEl) countEl.textContent = (START[id] ?? 0) + (hearts.counts[id] ?? 0);
+  if (!animate) return;
+  btn.classList.remove('pop', 'unpop');
+  void btn.offsetWidth;                       // Animation neu starten
+  btn.classList.add(on ? 'pop' : 'unpop');
+  if (on) {
+    btn.querySelector('.heart-burst')?.remove();
+    const burst = document.createElement('span');
+    burst.className = 'heart-burst';
+    burst.setAttribute('aria-hidden', 'true');
+    burst.style.left = (img.offsetLeft + img.offsetWidth / 2) + 'px';
+    burst.style.top = (img.offsetTop + img.offsetHeight / 2) + 'px';
+    burst.innerHTML = Array.from({ length: 6 }, (_, i) => `<i style="--a:${i * 60 + 30}deg"></i>`).join('');
+    btn.appendChild(burst);
+    setTimeout(() => burst.remove(), 700);
+  }
+}
+const paintHearts = () => document.querySelectorAll('.act.like').forEach(b => paintLike(b));
+
+async function loadHearts() {
+  try {
+    const r = await fetch(HEARTS_API + '/api/hearts');
+    if (!r.ok) throw r.status;
+    hearts.counts = (await r.json()).counts;
+    store.set(HK.counts, hearts.counts);
+  } catch { /* offline oder Limit erreicht: die zuletzt bekannten Zahlen bleiben stehen */ }
+  paintHearts();
+}
+
+async function toggleLike(btn) {
+  const id = btn.dataset.post;
+  if (hearts.busy.has(id)) return;
+  hearts.busy.add(id);
+
+  const want = !hearts.mine.has(id), before = hearts.counts[id] ?? 0;
+  want ? hearts.mine.add(id) : hearts.mine.delete(id);          // sofort anzeigen, danach mit dem Server abgleichen
+  hearts.counts[id] = Math.max(0, before + (want ? 1 : -1));
+  paintLike(btn, true);
+
+  try {
+    const r = await fetch(HEARTS_API + '/api/heart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Voter': store.get(HK.token, '') },
+      body: JSON.stringify({ post: id, on: want }),
+    });
+    if (!r.ok) throw r.status;
+    const d = await r.json();
+    if (d.token) store.set(HK.token, d.token);
+    hearts.counts[id] = d.n;
+  } catch (err) {
+    want ? hearts.mine.delete(id) : hearts.mine.add(id);        // zurückrollen
+    hearts.counts[id] = before;
+    toast(err === 429 ? 'Gerade sehr viele Herzen – bitte kurz warten' : 'Herz gerade nicht möglich – bitte später erneut versuchen');
+  } finally {
+    hearts.busy.delete(id);
+    store.set(HK.mine, [...hearts.mine]);
+    store.set(HK.counts, hearts.counts);
+    paintLike(btn);
+  }
+}
+
+paintHearts();   // sofort mit den zuletzt bekannten Zahlen
+loadHearts();
+
+document.getElementById('feed').addEventListener('click', e => {
+  if (e.target.closest('[data-action="share"]')) share();
+  const like = e.target.closest('[data-action="like"]');
+  if (like) toggleLike(like);
+});
+
+/* =====================  KI-Overlay  =====================
+   Öffnet sich über das Symbol 1204.svg (data-action="ki"). Alles dahinter wird weichgezeichnet.
+   Erst ein Klick auf den Button im Overlay leitet endgültig zum gewählten Anbieter weiter. */
+const KI_ANBIETER = [
+  { id: 'chatgpt', name: 'ChatGPT', firma: 'OpenAI',    url: 'https://chatgpt.com/', login: false },
+  { id: 'claude',  name: 'Claude',  firma: 'Anthropic', url: 'https://claude.ai/',   login: true  },   // login: true = Hinweis „Anmeldung erforderlich“
+  { id: 'grok',    name: 'Grok',    firma: 'xAI',       url: 'https://grok.com/',    login: false },
+];
+// Ziel-Adresse je Anbieter. Aktuell nur die Startseite; hier wird später der Prompt übergeben.
+const kiUrl = anbieter => anbieter.url;
+
+const appEl = document.getElementById('app');
+const kiEl = document.createElement('div');
+kiEl.className = 'ki-overlay';
+kiEl.innerHTML = `
+  <div class="ki-dialog" role="dialog" aria-modal="true" aria-labelledby="ki-title" tabindex="-1">
+    <h2 class="ki-title" id="ki-title">Du willst mehr über unsere Forderungen erfahren?</h2>
+    <p class="ki-text">Dann hilft dir einer der folgenden KI-Anbieter weiter mit allen Fragen. Erst mit einem Klick auf den Button unten wirst du endgültig zum Anbieter weitergeleitet und verlässt diese Seite.</p>
+    <div class="ki-options" role="radiogroup" aria-label="KI-Anbieter">
+      ${KI_ANBIETER.map(a => `
+      <button class="ki-option" type="button" role="radio" aria-checked="false" data-id="${esc(a.id)}">
+        <span class="ki-name">${esc(a.name)}<small>${esc(a.firma)}</small></span>
+        <span class="ki-radio" aria-hidden="true"></span>
+      </button>`).join('')}
+    </div>
+    <p class="ki-hint" role="note" hidden>Hinweis: Für Claude ist eine Anmeldung erforderlich. Du benötigst dafür ein Konto bei Anthropic.</p>
+    <a class="ki-go" aria-disabled="true" target="_blank" rel="noopener noreferrer">Weiter zum Anbieter</a>
+    <button class="ki-cancel" type="button">Abbrechen</button>
+  </div>`;
+document.body.appendChild(kiEl);
+
+const kiDialog = kiEl.querySelector('.ki-dialog');
+const kiGo = kiEl.querySelector('.ki-go');
+const kiHint = kiEl.querySelector('.ki-hint');
+let kiOpener = null;
+
+function kiSelect(id) {
+  const a = KI_ANBIETER.find(x => x.id === id) || null;
+  kiEl.querySelectorAll('.ki-option').forEach(b => b.setAttribute('aria-checked', String(!!a && b.dataset.id === a.id)));
+  kiHint.hidden = !(a && a.login);
+  if (a) {
+    kiGo.href = kiUrl(a);
+    kiGo.textContent = 'Weiter zu ' + a.name;
+    kiGo.removeAttribute('aria-disabled');
+  } else {
+    kiGo.removeAttribute('href');
+    kiGo.textContent = 'Weiter zum Anbieter';
+    kiGo.setAttribute('aria-disabled', 'true');
+  }
+}
+function kiOpen(opener) {
+  kiOpener = opener;
+  kiSelect(null);   // bei jedem Öffnen ohne Vorauswahl
+  kiEl.classList.add('open');
+  document.documentElement.style.overflow = 'hidden';   // Seite dahinter nicht scrollbar
+  appEl.inert = true;
+  kiDialog.focus();
+}
+function kiClose() {
+  kiEl.classList.remove('open');
+  document.documentElement.style.overflow = '';
+  appEl.inert = false;
+  if (kiOpener) kiOpener.focus();
+}
+
+document.getElementById('feed').addEventListener('click', e => {
+  const b = e.target.closest('[data-action="ki"]');
+  if (b) kiOpen(b);
+});
+kiEl.addEventListener('click', e => {
+  if (e.target === kiEl || e.target.closest('.ki-cancel')) return kiClose();   // Tipp auf den Hintergrund oder „Abbrechen“
+  const opt = e.target.closest('.ki-option');
+  if (opt) return kiSelect(opt.dataset.id);
+  if (e.target.closest('.ki-go')) {
+    if (kiGo.getAttribute('aria-disabled') === 'true') e.preventDefault();
+    else setTimeout(kiClose, 0);   // Link öffnet sich im neuen Tab, Overlay schließt sich hier
+  }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && kiEl.classList.contains('open')) kiClose();
+});
+
+/* =====================  Feedback  =====================
+   Öffnet sich über das Symbol 1202.svg (data-action="feedback") und sendet an ein Google-Formular.
+   Die Forderung, die im angetippten Beitrag gerade sichtbar ist, wird automatisch mitgeschickt.
+   Die Daten stammen aus dem Formular: Link „Vorausgefüllten Link abrufen“ → ID und entry.-Nummern.
+   Hinweis: Der Versand per fetch (no-cors) ist eine bewährte, aber von Google nicht offiziell dokumentierte Methode.
+   Der Browser darf die Antwort nicht lesen, ein Erfolg lässt sich daher nicht prüfen – nur Netzwerkfehler werden gemeldet. */
+const GF_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSeyWxHQNCoIA_z5o563LEv_JPZeHQgy1OoCtY3Ldcz3OrBJkw/formResponse';
+const GF = {
+  nr:      'entry.1489388396',   // Forderung Nr.
+  head:    'entry.1566761208',   // Forderung Titel
+  message: 'entry.1020715503',   // Dein Feedback
+  email:   'entry.933855592',    // E-Mail (optional)
+};
+
+// Aktuell sichtbare Forderung des Beitrags, in dem das Symbol angetippt wurde
+function currentForderung(btn) {
+  const slider = btn.closest('.post').querySelector('.slider');
+  const slide = slider.children[Math.round(slider.scrollLeft / slider.clientWidth)];
+  const nr = slide ? slide.dataset.nr || '' : '';
+  const f = FORDERUNGEN.find(x => String(x.nr) === nr);
+  return { nr, head: f ? String(f.head).replace(/\s+/g, ' ').trim() : '' };
+}
+
+const fbEl = document.createElement('div');
+fbEl.className = 'ki-overlay';   // übernimmt Weichzeichner und Einblendung des KI-Fensters
+fbEl.innerHTML = `
+  <form class="ki-dialog" role="dialog" aria-modal="true" aria-labelledby="fb-title" tabindex="-1">
+    <h2 class="ki-title" id="fb-title">Dein Feedback</h2>
+    <p class="ki-text">Was gefällt dir, was fehlt, was ist unklar? Für eine Antwort trag optional deine E-Mail-Adresse ein.</p>
+    <p class="fb-ctx" hidden></p>
+    <textarea class="fb-field" name="message" rows="5" maxlength="2000" required placeholder="Dein Feedback"></textarea>
+    <input class="fb-field" name="email" type="email" autocomplete="email" placeholder="E-Mail (optional)">
+    <input class="fb-trap" name="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <p class="fb-note">Mit dem Absenden wird dein Feedback über Google Forms an uns übermittelt.</p>
+    <p class="ki-hint fb-status" role="status" hidden></p>
+    <button class="ki-go fb-send" type="submit">Senden</button>
+    <button class="ki-cancel" type="button">Abbrechen</button>
+  </form>`;
+document.body.appendChild(fbEl);
+
+const fbForm = fbEl.querySelector('form');
+const fbCtxEl = fbEl.querySelector('.fb-ctx');
+const fbStatus = fbEl.querySelector('.fb-status');
+const fbSend = fbEl.querySelector('.fb-send');
+let fbOpener = null, fbCtx = { nr: '', head: '' };
+
+function fbOpen(opener) {
+  fbOpener = opener;
+  fbCtx = currentForderung(opener);
+  fbCtxEl.textContent = fbCtx.head ? 'Dein Feedback bezieht sich auf:\n' + fbCtx.head : '';
+  fbCtxEl.hidden = !fbCtx.head;
+  fbStatus.hidden = true;
+  fbEl.classList.add('open');
+  document.documentElement.style.overflow = 'hidden';   // Seite dahinter nicht scrollbar
+  appEl.inert = true;
+  fbForm.message.focus();
+}
+function fbClose() {
+  fbEl.classList.remove('open');
+  document.documentElement.style.overflow = '';
+  appEl.inert = false;
+  if (fbOpener) fbOpener.focus();
+}
+
+document.getElementById('feed').addEventListener('click', e => {
+  const b = e.target.closest('[data-action="feedback"]');
+  if (b) fbOpen(b);
+});
+fbEl.addEventListener('click', e => {
+  if (e.target === fbEl || e.target.closest('.ki-cancel')) fbClose();   // Tipp auf den Hintergrund oder „Abbrechen“
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && fbEl.classList.contains('open')) fbClose();
+});
+fbForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  if (fbForm.hp.value) return;                        // Honeypot ausgefüllt = Bot
+  const message = fbForm.message.value.trim();
+  if (!message) { fbForm.message.focus(); return; }
+  fbSend.disabled = true;
+  const body = new URLSearchParams({
+    [GF.nr]: fbCtx.nr, [GF.head]: fbCtx.head,
+    [GF.message]: message, [GF.email]: fbForm.email.value.trim(),
+  });
+  try {
+    await fetch(GF_URL, { method: 'POST', mode: 'no-cors', body });
+    fbForm.reset(); fbClose(); toast('Danke für dein Feedback!');
+  } catch {
+    fbStatus.textContent = 'Das Senden hat nicht geklappt. Bitte prüfe deine Verbindung und versuche es noch einmal.';
+    fbStatus.hidden = false;
+  } finally {
+    fbSend.disabled = false;
+  }
+});
+
+/* =====================  Schriftgröße der Forderung einpassen  =====================
+   Forderung: zweizeilig, so groß wie möglich (bis HEAD_MAX) – die breitere der beiden Zeilen füllt die Textbreite.
+   Erklärung: feste Schriftgröße (--body-size im CSS), Umbruch automatisch durch den Browser. */
+function fitText() {
+  document.querySelectorAll('.slide').forEach(s => {
+    const W = s.clientWidth; if (!W) return;
+    const avail = W * (100 - 2 * PAD) / 100, cqw = W / 100;
+    const head = s.querySelector('.head');
+    head.style.fontSize = '100px';   // Messung bei bekannter Größe
+    head.style.fontSize = Math.min(HEAD_MAX, 100 * avail / head.offsetWidth / cqw) + 'cqw';
+  });
+}
+fitText();
+if (document.fonts) {   // nach dem Laden der Schriften neu einpassen (Textbreiten hängen von der Schrift ab)
+  Promise.all(['900 1em "Work Sans"'].map(f => document.fonts.load(f))).then(fitText, fitText);
+  document.fonts.ready.then(fitText);
+}
+
+/* =====================  Wischbare Bildbereiche: Punkte + Bildwechsel-Animation  ===================== */
+
+document.querySelectorAll('.post').forEach(post => {
+  const slider = post.querySelector('.slider');
+  const slides = [...slider.querySelectorAll('.slide')];
+  const dots = [...post.querySelectorAll('.dot')];
+  let current = 0;
+
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      const idx = slides.indexOf(e.target);
+      if (idx === current) return;
+      current = idx;
+      dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+      const img = e.target.querySelector('img');
+      img.classList.remove('enter');
+      void img.offsetWidth;              // Animation neu starten
+      img.classList.add('enter');
+    });
+  }, { root: slider, threshold: 0.6 });
+
+  slides.forEach(s => io.observe(s));
+  slider.addEventListener('animationend', e => e.target.classList.remove('enter'));
+});
+
+</script>
+</body>
+</html>
