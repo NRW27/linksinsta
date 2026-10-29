@@ -1,0 +1,36 @@
+name = "herzen"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+# Genau die Adresse, auf der index.html läuft (mit https://, ohne Schrägstrich am Ende)
+ALLOWED_ORIGIN = "https://www.deine-seite.de"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "herzen"
+database_id = "f17244f3-01be-4538-a71a-184dd76ccce0"
+
+# Grobe Bremse pro IP und pro Token (gilt je Cloudflare-Standort, ist also nur eine Näherung)
+[[ratelimits]]
+name = "RL_IP"
+namespace_id = "1001"
+[ratelimits.simple]
+limit = 60
+period = 60
+
+[[ratelimits]]
+name = "RL_VOTER"
+namespace_id = "1002"
+[ratelimits.simple]
+limit = 20
+period = 60
+
+# Nachts alte Einträge der Tabelle "issued" löschen
+[triggers]
+crons = ["17 3 * * *"]
+
+# Empfohlen, sobald eine eigene Domain bei Cloudflare liegt: Der Worker läuft dann unter derselben
+# Adresse wie die Seite (/api/...). Das spart CORS-Vorabfragen (sonst doppelt so viele Requests)
+# und aktiviert den Edge-Cache, der auf *.workers.dev nicht funktioniert.
+# routes = [{ pattern = "www.deine-seite.de/api/*", zone_name = "deine-seite.de" }]
