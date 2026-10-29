@@ -29,7 +29,7 @@
     --dim: 0.3;             /* Deckkraft der Abdunklung aller Beitragsbilder (0.3 = 30 %) */
     --dim-farbe: 129 0 161; /* Farbe der Abdunklung als RGB-Kanäle: #8100A1 (Rückbau auf Schwarz: 0 0 0) */
     --verlauf-start: 30%;   /* Höhe im Bild (von oben), ab der der Rot-Verlauf beginnt */
-    --verlauf-ende: 100%;   /* Höhe im Bild (von oben), an der das Bild vollständig in #FF0000 übergegangen ist */
+    --verlauf-ende: 100%;   /* Höhe im Bild (von oben), an der der Verlauf seine Endstufe erreicht hat (#FF0000 mit 80 % Deckkraft = #ff0000cc) */
     --blende-dauer: 220ms;  /* Überblendung beim Bildwechsel (kurz und sanft; 0ms = harter Wechsel) */
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -117,7 +117,7 @@
   .slide img { width: 100%; height: 100%; object-fit: cover; }
 
   /* Abdunklung + Verlauf + Text auf dem Bild (liegen über dem Bild)
-     Verlauf: am Anfang der Richtung ist das Bild unverändert, zum Ende hin geht es stufenlos in #FF0000 über (#ff000000 = dasselbe Rot, voll durchsichtig).
+     Verlauf: am Anfang der Richtung ist das Bild unverändert, zum Ende hin geht es stufenlos in #FF0000 mit 80 % Deckkraft (#ff0000cc) über (#ff000000 = dasselbe Rot, voll durchsichtig).
      Die Richtung steht pro Bild im Attribut data-verlauf; gesetzt wird es aus der Tabelle VERLAUF (Skript, Abschnitt „Konfiguration“), ohne Eintrag gilt oben-unten. Alle Bilder eines Beitrags übernehmen dabei den Verlauf seines ersten Bildes. Die acht Modi:
        links-rechts  rechts-links  unten-oben  oben-unten
        ecke-lo-ru (links oben → rechts unten)  ecke-ro-lu (rechts oben → links unten)
@@ -134,7 +134,7 @@
   .slide::after {
     content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
     background:
-      linear-gradient(var(--verlauf-richtung), #ff000000 var(--verlauf-start), #ff0000 var(--verlauf-ende)),
+      linear-gradient(var(--verlauf-richtung), #ff000000 var(--verlauf-start), #ff0000cc var(--verlauf-ende)),
       rgb(var(--dim-farbe) / var(--dim));
   }
   .overlay { position: absolute; inset: 0; z-index: 2; color: #fff; text-align: center; pointer-events: none; }
@@ -357,7 +357,7 @@ const STORIES = [
 /* ---------- Verlauf-Effekt je Bild ----------
    Jedes Beitragsbild (001.jpg bis 180.jpg) hat einen eigenen Eintrag. Wirksam ist aber nur der Eintrag des ersten Bildes eines Beitrags: alle Bilder desselben Beitrags übernehmen seinen Modus (ruhigeres Scrollen).
    Den Verlauf eines Beitrags ändern: den Modus in der Zeile seines ersten Bildes ändern (die Einträge der übrigen Bilder werden ignoriert).
-   Modi (Rot, #FF0000, liegt am Ende der genannten Richtung; Darstellung siehe .slide[data-verlauf] im CSS):
+   Modi (Rot, #FF0000 mit 80 % Deckkraft, liegt am Ende der genannten Richtung; Darstellung siehe .slide[data-verlauf] im CSS):
      'links-rechts'  'rechts-links'  'unten-oben'  'oben-unten'
      'ecke-lo-ru' (links oben → rechts unten)   'ecke-ro-lu' (rechts oben → links unten)
      'ecke-lu-ro' (links unten → rechts oben)   'ecke-ru-lo' (rechts unten → links oben)
