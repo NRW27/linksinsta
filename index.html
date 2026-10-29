@@ -29,6 +29,7 @@
     --dim: 0.3;             /* Abdunklung aller Beitragsbilder (0.3 = 30 %) */
     --verlauf-start: 30%;   /* Höhe im Bild (von oben), ab der der Rot-Verlauf beginnt */
     --verlauf-ende: 100%;   /* Höhe im Bild (von oben), an der das Bild vollständig in #FF0000 übergegangen ist */
+    --blende-dauer: 220ms;  /* Überblendung beim Bildwechsel (kurz und sanft; 0ms = harter Wechsel) */
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; background: #f2f2f2; }
@@ -96,11 +97,17 @@
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scroll-snap-type: x mandatory;
+    touch-action: pan-y pinch-zoom;   /* seitliche Wischbewegungen übernimmt das Skript (sofortiger Bildwechsel, siehe unten); vertikales Scrollen bleibt unverändert */
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     background: var(--placeholder);
   }
   .slider::-webkit-scrollbar { display: none; }
+  .slider-wrap { position: relative; }
+  /* Überblendung beim Bildwechsel: das neue Bild steht sofort an seiner Stelle, eine Kopie des bisherigen Bildes liegt kurz darüber und blendet aus */
+  .blende { position: absolute; inset: 0; z-index: 3; overflow: hidden; pointer-events: none; animation: blende-aus var(--blende-dauer) ease-out forwards; }
+  .blende .slide { flex: none; width: 100%; height: 100%; }
+  @keyframes blende-aus { from { opacity: 1; } to { opacity: 0; } }
   .slide {
     flex: 0 0 100%; height: 100%;
     scroll-snap-align: start; scroll-snap-stop: always;
@@ -108,9 +115,9 @@
   }
   .slide img { width: 100%; height: 100%; object-fit: cover; }
 
-  /* Abdunklung + Verlauf + Text auf dem Bild (liegen über dem Bild, bleiben beim Bildwechsel-Zoom ruhig)
+  /* Abdunklung + Verlauf + Text auf dem Bild (liegen über dem Bild)
      Verlauf: am Anfang der Richtung ist das Bild unverändert, zum Ende hin geht es stufenlos in #FF0000 über (#ff000000 = dasselbe Rot, voll durchsichtig).
-     Die Richtung steht pro Bild im Attribut data-verlauf; gesetzt wird es aus der Tabelle VERLAUF (Skript, Abschnitt „Konfiguration“), ohne Eintrag gilt oben-unten. Die acht Modi:
+     Die Richtung steht pro Bild im Attribut data-verlauf; gesetzt wird es aus der Tabelle VERLAUF (Skript, Abschnitt „Konfiguration“), ohne Eintrag gilt oben-unten. Alle Bilder eines Beitrags übernehmen dabei den Verlauf seines ersten Bildes. Die acht Modi:
        links-rechts  rechts-links  unten-oben  oben-unten
        ecke-lo-ru (links oben → rechts unten)  ecke-ro-lu (rechts oben → links unten)
        ecke-lu-ro (links unten → rechts oben)  ecke-ru-lo (rechts unten → links oben) */
@@ -158,13 +165,6 @@
   }
   .ln { display: block; white-space: nowrap; }
 
-  /* Bildwechsel: das neu eingerastete Bild zoomt kurz heran und blendet ein */
-  .slide img.enter { animation: slide-enter 380ms cubic-bezier(.2, .7, .2, 1); }
-  @keyframes slide-enter {
-    from { opacity: 0.35; transform: scale(1.09); }
-    to   { opacity: 1;    transform: scale(1); }
-  }
-
   .dots {
     display: flex; justify-content: center; gap: 0.95cqw;
     padding-top: 3cqw;
@@ -172,7 +172,6 @@
   .dot {
     width: 1.2cqw; height: 1.2cqw; border-radius: 50%;
     background: var(--dot);
-    transition: background-color 200ms ease, transform 200ms ease;
   }
   .dot.active { background: var(--accent); transform: scale(1.1); }
 
@@ -294,8 +293,6 @@
   .fb-send:disabled { opacity: 0.6; pointer-events: none; }
 
   @media (prefers-reduced-motion: reduce) {
-    .slide img.enter { animation: none; }
-    .dot { transition: none; }
     .ki-overlay, .ki-dialog { transition: none; }
     .act.like.pop img, .act.like.unpop img { animation: none; }
     .heart-burst { display: none; }
@@ -354,7 +351,8 @@ const STORIES = [
 ];
 
 /* ---------- Verlauf-Effekt je Bild ----------
-   Jedes Beitragsbild (001.jpg bis 180.jpg) hat einen eigenen Eintrag und lässt sich einzeln steuern: einfach den Modus in der Zeile ändern.
+   Jedes Beitragsbild (001.jpg bis 180.jpg) hat einen eigenen Eintrag. Wirksam ist aber nur der Eintrag des ersten Bildes eines Beitrags: alle Bilder desselben Beitrags übernehmen seinen Modus (ruhigeres Scrollen).
+   Den Verlauf eines Beitrags ändern: den Modus in der Zeile seines ersten Bildes ändern (die Einträge der übrigen Bilder werden ignoriert).
    Modi (Rot, #FF0000, liegt am Ende der genannten Richtung; Darstellung siehe .slide[data-verlauf] im CSS):
      'links-rechts'  'rechts-links'  'unten-oben'  'oben-unten'
      'ecke-lo-ru' (links oben → rechts unten)   'ecke-ro-lu' (rechts oben → links unten)
@@ -736,8 +734,8 @@ const bodyText = t => t
 const bodyHTML = t => esc(bodyText(t)).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');   // **Wort** wird fett (nach dem Maskieren, einzelne * wie in „Schüler*innen“ bleiben unverändert)
 const linesHTML = (t, n) => splitLines(t, n).map(l => `<span class="ln">${esc(l)}</span>`).join('');
 
-const slideHTML = (f, lazy) => `
-        <div class="slide" data-nr="${esc(f.nr)}" data-verlauf="${esc(verlaufVon(f.img))}">
+const slideHTML = (f, lazy, verlauf) => `
+        <div class="slide" data-nr="${esc(f.nr)}" data-verlauf="${esc(verlauf)}">
           <img src="${esc(f.img)}" alt="" draggable="false" ${lazy ? 'loading="lazy"' : ''} decoding="async">
           <div class="overlay">
             <div class="zone zone-head"><div class="head">${linesHTML(f.head, HEAD_LINES)}</div></div>
@@ -753,8 +751,10 @@ document.getElementById('feed').innerHTML = POSTS.map((p, pi) => `
       </a>
       <span class="post-user">${esc(p.user)}</span>
     </header>
-    <div class="slider">
-      ${p.slides.map((f, i) => slideHTML(f, pi || i)).join('')}
+    <div class="slider-wrap">
+      <div class="slider">
+        ${p.slides.map((f, i) => slideHTML(f, pi || i, verlaufVon(p.slides[0].img))).join('')}
+      </div>
     </div>
     <div class="dots" aria-hidden="true">
       ${p.slides.map((_, i) => `<span class="dot${i ? '' : ' active'}"></span>`).join('')}
@@ -1080,13 +1080,72 @@ if (document.fonts) {   // nach dem Laden der Schriften neu einpassen (Textbreit
   document.fonts.ready.then(fitText);
 }
 
-/* =====================  Wischbare Bildbereiche: Punkte + Bildwechsel-Animation  ===================== */
+/* =====================  Wischbare Bildbereiche: sofortiger Bildwechsel + Punkte  ===================== */
+
+// Jede seitliche Wischbewegung (Touch, Stift, seitliches Scrollen am Trackpad / mit Shift + Mausrad) schaltet sofort
+// genau ein Bild weiter bzw. zurück – ohne Mitziehen und ohne Gleiten, nur mit kurzer Überblendung (--blende-dauer im CSS).
+// Vertikales Wischen bleibt unberührt.
+const SWIPE_SCHWELLE = 16;   // px seitlicher Weg, ab dem die Bewegung als Wischen zählt (kleiner = reagiert früher)
 
 document.querySelectorAll('.post').forEach(post => {
   const slider = post.querySelector('.slider');
   const slides = [...slider.querySelectorAll('.slide')];
   const dots = [...post.querySelectorAll('.dot')];
   let current = 0;
+
+  const wrap = slider.parentElement;   // .slider-wrap: hier liegt die ausblendende Kopie des bisherigen Bildes
+  const reduziert = matchMedia('(prefers-reduced-motion: reduce)');
+  const blende = alt => {
+    wrap.querySelectorAll('.blende').forEach(g => g.remove());   // schnelle Folge: nur die jüngste Überblendung bleibt
+    if (!alt || reduziert.matches) return;
+    const kopie = alt.cloneNode(true);
+    kopie.querySelectorAll('img').forEach(i => { i.loading = 'eager'; });
+    const g = document.createElement('div');
+    g.className = 'blende';
+    g.setAttribute('aria-hidden', 'true');
+    g.appendChild(kopie);
+    wrap.appendChild(g);
+    g.addEventListener('animationend', () => g.remove(), { once: true });
+    setTimeout(() => g.remove(), 800);   // Sicherheitsnetz, falls animationend ausbleibt
+  };
+
+  const gehe = dir => {   // dir: 1 = nächstes Bild, -1 = vorheriges Bild (am Rand passiert nichts)
+    const w = slider.clientWidth;
+    if (!w) return;
+    const idx = Math.round(slider.scrollLeft / w);
+    const ziel = Math.max(0, Math.min(slides.length - 1, idx + dir));
+    if (ziel === idx) return;
+    blende(slides[idx]);
+    slider.scrollTo({ left: ziel * w, behavior: 'instant' });
+  };
+
+  // Touch / Stift
+  let start = null;   // laufende Berührung, solange für sie noch kein Bildwechsel ausgelöst wurde
+  slider.addEventListener('pointerdown', e => {
+    start = e.pointerType === 'mouse' ? null : { id: e.pointerId, x: e.clientX, y: e.clientY };
+  });
+  slider.addEventListener('pointermove', e => {
+    if (!start || e.pointerId !== start.id) return;
+    const dx = e.clientX - start.x, dy = e.clientY - start.y;
+    if (Math.abs(dx) < SWIPE_SCHWELLE || Math.abs(dx) < Math.abs(dy)) return;
+    start = null;                          // pro Wischbewegung genau ein Bildwechsel
+    gehe(dx < 0 ? 1 : -1);
+  });
+  slider.addEventListener('pointerup', () => { start = null; });
+  slider.addEventListener('pointercancel', () => { start = null; });
+
+  // Trackpad / Mausrad (seitlich): ein Bildwechsel je Geste, das Nachlaufen der Trägheit löst keinen zweiten aus
+  let radLetzt = 0;
+  slider.addEventListener('wheel', e => {
+    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;   // vertikales Scrollen der Seite bleibt unberührt
+    e.preventDefault();
+    const jetzt = performance.now();
+    if (jetzt - radLetzt > 160) {
+      if (Math.abs(e.deltaX) < 2) return;
+      gehe(e.deltaX > 0 ? 1 : -1);
+    }
+    radLetzt = jetzt;
+  }, { passive: false });
 
   const io = new IntersectionObserver(entries => {
     entries.forEach(e => {
@@ -1095,15 +1154,10 @@ document.querySelectorAll('.post').forEach(post => {
       if (idx === current) return;
       current = idx;
       dots.forEach((d, i) => d.classList.toggle('active', i === idx));
-      const img = e.target.querySelector('img');
-      img.classList.remove('enter');
-      void img.offsetWidth;              // Animation neu starten
-      img.classList.add('enter');
     });
   }, { root: slider, threshold: 0.6 });
 
   slides.forEach(s => io.observe(s));
-  slider.addEventListener('animationend', e => e.target.classList.remove('enter'));
 });
 
 </script>
