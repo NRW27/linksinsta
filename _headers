@@ -1,0 +1,43 @@
+/export-bilder/*
+  Access-Control-Allow-Origin: *
+
+/Wahlprogramm/*
+  Access-Control-Allow-Origin: *
+  Content-Type: text/markdown; charset=utf-8
+
+/Talking-Points/*
+  X-Robots-Tag: noindex, nofollow
+
+/Briefings/*
+  X-Robots-Tag: noindex, nofollow
+
+/
+  X-Robots-Tag: noindex, nofollow
+
+/index.html
+  X-Robots-Tag: noindex, nofollow
+
+/404.html
+  X-Robots-Tag: noindex, nofollow
+
+/*.js
+  X-Robots-Tag: noindex, nofollow
+
+/*.svg
+  X-Robots-Tag: noindex, nofollow
+
+/*.jpg
+  X-Robots-Tag: noindex, nofollow
+
+/*.webp
+  X-Robots-Tag: noindex, nofollow
+
+/fonts/*
+  X-Robots-Tag: noindex, nofollow
+
+/Hintergrundbilder/*
+  X-Robots-Tag: noindex, nofollow
+
+/export-bilder/*
+  X-Robots-Tag: noindex, nofollow
+

@@ -25,15 +25,17 @@
     --text: #262626;
     --accent: #5a67e6;      /* aktiver Punkt */
     --dot: #d2d2d8;        /* inaktive Punkte */
-    --placeholder: #b960dd; /* Platzhalterfarbe, solange ein Beitragsbild lädt */
-    --dim: 0.3;             /* Deckkraft der Abdunklung aller Beitragsbilder (0.3 = 30 %) */
-    --dim-farbe: 129 0 161; /* Farbe der Abdunklung als RGB-Kanäle: #8100A1 (Rückbau auf Schwarz: 0 0 0) */
+    --placeholder: #e6e6ea; /* Platzhalterfarbe, solange ein Beitragsbild lädt (wie die Platzhalter .sk, dazu derselbe Glanz) */
+    --dim: 0.2;             /* Deckkraft der generellen Abdunklung unter dem Farbverlauf (0.2 = 20 %), hält die Schrift in der Bildmitte lesbar */
+    --dim-farbe: 0 0 0;     /* Farbe der Abdunklung als RGB-Kanäle: Schwarz (Alternative: 129 0 161 = Violett #8100A1) */
     --verlauf-start: 30%;   /* Höhe im Bild (von oben), ab der der Rot-Verlauf beginnt */
     --verlauf-ende: 100%;   /* Höhe im Bild (von oben), an der der Verlauf seine Endstufe erreicht hat (#FF0000 mit 80 % Deckkraft = #ff0000cc) */
     --blende-dauer: 220ms;  /* Überblendung beim Bildwechsel (kurz und sanft; 0ms = harter Wechsel) */
+    --kat-groesse: 17cqw;   /* Kantenlänge der quadratischen Logos: Kategorie oben links, 1210.svg oben rechts */
+    --kat-schrift: 3cqw;    /* Schriftgröße des Ersatztitels, solange das Logo fehlt („Gesundheit“ füllt so gerade die Logobreite) */
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; background: #f2f2f2; }
+  html, body { margin: 0; background: #fff; }   /* Flächen links und rechts der Beiträge weiß (wie der Header, in beiden Formaten) */
   body {
     color: var(--text);
     font-family: var(--font-text);
@@ -50,32 +52,93 @@
   img { display: block; -webkit-user-drag: none; user-select: none; }
   button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 
+  /* ---------- Querformat: zwei Beiträge nebeneinander ----------
+     Hochformat: --u = 1cqw (1 % der App-Breite = Spaltenbreite).
+     Querformat: Die App wird doppelt so breit (zwei Spalten à max. 480 px + Spalt), jeder Beitrag ist ein eigener Container,
+     seine cqw beziehen sich also auf die Spaltenbreite – Beiträge sehen exakt aus wie im Hochformat.
+     Der Header nimmt in beiden Formaten die volle Sichtbreite ein (z. B. iPad im Hochformat: Beiträge 480 px, Header über
+     die ganze Breite); seine Maße (--u) bleiben auf die Spaltenbreite bezogen, so passen entsprechend mehr Kandidaten hinein.
+     Auf dem Handy im Hochformat ist die Sichtbreite gleich der App-Breite – dort ändert sich nichts. */
+  :root { --u: 1cqw; --spalt: 0px; }
+  html { overflow-x: clip; }   /* verhindert seitliches Scrollen durch den 100vw breiten Header (Scrollleiste am Desktop) */
+  .stories-wrap {
+    /* Header bricht aus der App aus und nimmt die volle Sichtbreite ein */
+    width: calc(100vw - var(--sb, 0px)); margin-inline: calc(50% - (100vw - var(--sb, 0px)) / 2);   /* --sb = Breite der Scrollleiste (Skript direkt nach <main>) */
+    background: #fff;
+  }
+  .stories { padding-left: calc(2.35 * var(--u) + env(safe-area-inset-left, 0px)); padding-right: calc(2.35 * var(--u) + env(safe-area-inset-right, 0px)); }
+  @media (orientation: landscape) and (min-width: 640px) {
+    :root { --spalt: 112px; }   /* Test: verdoppelt (vorher 56px) */   /* Abstand zwischen den beiden Spalten */
+    .app {
+      width: min(100%, calc(2 * 480px + var(--spalt)));
+      padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);   /* Notch bei gedrehtem Handy */
+    }
+    .stories-wrap { --u: calc((100cqw - var(--spalt)) / 200); }   /* 1 % einer Spaltenbreite (Header-Breite siehe oben) */
+    #feed { display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--spalt); align-items: start; }
+    .post { container-type: inline-size; min-width: 0; }
+    .lade-hinweis { grid-column: 1 / -1; font-size: 15px; line-height: 21px; }
+  }
+
+  /* ---------- Pfeil-Buttons für Maus-Bedienung (Header und Bilder eines Beitrags) ----------
+     Nur auf Geräten mit Maus (hover + feiner Zeiger) sichtbar; auf Touch-Geräten bleiben sie ausgeblendet. */
+  .stories-wrap { position: relative; }
+  .pfeil {
+    display: none; position: absolute; top: 50%; z-index: 4;
+    width: 32px; height: 32px; margin-top: -16px; border-radius: 50%;
+    align-items: center; justify-content: center;
+    background: rgb(255 255 255 / 0.9); color: #262626;
+    box-shadow: 0 1px 5px rgb(0 0 0 / 0.3);
+    transition: opacity 150ms ease, transform 100ms ease;
+  }
+  .pfeil svg { width: 16px; height: 16px; }
+  .pfeil:hover { background: #fff; }
+  .pfeil:active { transform: scale(0.92); }
+  .pfeil:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .pfeil-l { left: 10px; }
+  .pfeil-r { right: 10px; }
+  .slider-wrap .pfeil { top: auto; bottom: 12px; margin-top: 0; }   /* im Beitrag ganz unten am Bild */
+  .stories-wrap .pfeil { margin-top: -22px; }   /* auf Höhe der Kreise, nicht der Namen */
+  .slider:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+  @media (hover: hover) and (pointer: fine) {
+    .pfeil { display: flex; }
+    .pfeil[hidden] { display: none; }
+    .slider-wrap .pfeil { opacity: 0; }   /* im Beitrag erst beim Überfahren mit der Maus */
+    .slider-wrap:hover .pfeil, .slider-wrap:focus-within .pfeil { opacity: 1; }
+    /* Header: Portraits unter den Pfeilen weichzeichnen – zum Rand hin stark, nach innen auslaufend */
+    .stories-wrap::before, .stories-wrap::after {
+      content: ""; position: absolute; top: 0; bottom: 0; z-index: 3; width: 76px;
+      pointer-events: none;
+      -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+      background: rgb(255 255 255 / 0.25);
+    }
+    .stories-wrap::before { left: 0;  -webkit-mask-image: linear-gradient(to right, #000 45%, transparent); mask-image: linear-gradient(to right, #000 45%, transparent); }
+    .stories-wrap::after  { right: 0; -webkit-mask-image: linear-gradient(to left,  #000 45%, transparent); mask-image: linear-gradient(to left,  #000 45%, transparent); }
+  }
+
   /* ---------- Header: Karussell mit runden Icons ---------- */
   .stories {
     position: relative;
     display: flex;
-    gap: 3.05cqw;
-    padding: 2.2cqw 2.35cqw 1.6cqw;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    gap: calc(3.05 * var(--u));
+    padding: calc(2.2 * var(--u)) calc(2.35 * var(--u)) calc(1.6 * var(--u));
+    overflow: hidden;      /* kein Scrollen des Browsers: das Skript verschiebt die Storys selbst (siehe „Story-Karussell“) */
+    touch-action: pan-y;   /* senkrechtes Wischen scrollt die Seite, waagerechtes übernimmt das Skript */
   }
-  .stories::-webkit-scrollbar { display: none; }
-  .story { display: block; flex: 0 0 24.2cqw; width: 24.2cqw; text-align: center; color: inherit; text-decoration: none; -webkit-touch-callout: none; }
+  .story { display: block; flex: 0 0 calc(24.2 * var(--u)); width: calc(24.2 * var(--u)); text-align: center; color: inherit; text-decoration: none; -webkit-touch-callout: none;
+    will-change: transform; }   /* je Story eine kleine Grafikebene: wird beim Wischen nur verschoben, nie neu gezeichnet */
   .story-ring {
-    width: 24.2cqw; aspect-ratio: 1; border-radius: 50%;
-    padding: 0.7cqw;
+    width: calc(24.2 * var(--u)); aspect-ratio: 1; border-radius: 50%;
+    padding: calc(0.7 * var(--u));
     background: linear-gradient(40deg, #f9c931 5%, #f2832b 25%, #e8326a 52%, #c52bc0 78%);
   }
-  .story-gap { width: 100%; height: 100%; border-radius: 50%; background: #fff; padding: 1.1cqw; }
+  .story-gap { width: 100%; height: 100%; border-radius: 50%; background: #fff; padding: calc(1.1 * var(--u)); }
   .story-gap img {
     width: 100%; height: 100%; border-radius: 50%; object-fit: cover;
-    background: #e6e6ea; box-shadow: 0 0 0 0.15cqw #dcdcdc;
+    background: #e6e6ea; box-shadow: 0 0 0 calc(0.15 * var(--u)) #dcdcdc;
   }
   .story-name {
-    margin-top: 0.6cqw;
-    font-size: 2.65cqw; line-height: 3.4cqw;
+    margin-top: calc(0.6 * var(--u));
+    font-size: calc(2.65 * var(--u)); line-height: calc(3.4 * var(--u));
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 
@@ -95,11 +158,10 @@
   .slider {
     display: flex;
     aspect-ratio: 4 / 5;
-    overflow-x: auto;
+    overflow-x: hidden;   /* kein natives seitliches Scrollen: nur das Skript wechselt das Bild (immer um genau ein ganzes Bild), so gibt es keine halb verschobenen Zwischenstände */
     overscroll-behavior-x: contain;
-    scroll-snap-type: x mandatory;
+    scroll-snap-type: x mandatory;   /* hält das Bild bei Größenänderungen exakt ausgerichtet */
     touch-action: pan-y pinch-zoom;   /* seitliche Wischbewegungen übernimmt das Skript (sofortiger Bildwechsel, siehe unten); vertikales Scrollen bleibt unverändert */
-    -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     background: var(--placeholder);
   }
@@ -131,13 +193,31 @@
   .slide[data-verlauf="ecke-ro-lu"]   { --verlauf-richtung: 225deg; --schatten-x: -0.707; --schatten-y: 0.707; }
   .slide[data-verlauf="ecke-lu-ro"]   { --verlauf-richtung: 45deg; --schatten-x: 0.707; --schatten-y: -0.707; }    /* links unten → rechts oben */
   .slide[data-verlauf="ecke-ru-lo"]   { --verlauf-richtung: 315deg; --schatten-x: -0.707; --schatten-y: -0.707; }   /* rechts unten → links oben */
+  /* Farbverlauf für alle Bilder, diagonal von links oben nach rechts unten (135°, fester Winkel wie bei ecke-lo-ru):
+     Farbe: 0–50 % Rot (#FF0000), 50–100 % gleichmäßiger Übergang nach Violett (#8100A1) in der rechten unteren Ecke.
+     Transparenz (abgestimmt mit Testbildern): links oben 0 % (volles Rot) → stetig bis zur Bildmitte 70 % → stetig bis rechts unten 30 %.
+     Das Foto ist so in der Bildmitte deutlich zu sehen, die Ecken bleiben kräftig farbig. (Mittelpunkt bei 60 % getestet, 50 % wirkt harmonischer.)
+     Darunter liegt eine generelle Abdunklung (--dim, --dim-farbe: 20 % Schwarz), damit die Schrift auch auf hellen Fotostellen lesbar bleibt.
+     Die Modus-Regeln oben (data-verlauf) wirken hier nicht mehr; zum Zurückschalten die Zeile mit linear-gradient(var(--verlauf-richtung) …) wieder eintragen. */
   .slide::after {
     content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
     background:
-      linear-gradient(var(--verlauf-richtung), #ff000000 var(--verlauf-start), #ff0000cc var(--verlauf-ende)),
+      linear-gradient(135deg, rgb(255 0 0 / 1) 0%, rgb(255 0 0 / 0.3) 50%, rgb(129 0 161 / 0.7) 100%),
       rgb(var(--dim-farbe) / var(--dim));
   }
   .overlay { position: absolute; inset: 0; z-index: 2; color: #fff; text-align: center; pointer-events: none; }
+  /* Feed: Ladeschicht. Darunter entsteht der fertige Beitrag (Bild, Verlauf, Text) unsichtbar; darüber liegt eine deckende
+     Fläche in Platzhalterfarbe mit dem wandernden Glanz der Platzhalter (.sk). Erst wenn das Bild geladen und dekodiert ist
+     (Klasse .wartet entfällt), verschwindet die Ladeschicht – der Beitrag erscheint auf einmal, nie halb fertig.
+     isolation: Die Schichten der Folie bleiben unter Pfeilen und Überblendung. */
+  .slide { isolation: isolate; }
+  .lade { position: absolute; inset: 0; z-index: 3; overflow: hidden; pointer-events: none; background: var(--placeholder); }
+  .lade::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+    transform: translateX(-100%); animation: sk-glanz 1.4s ease-in-out infinite;
+  }
+  .slide:not(.wartet) > .lade { display: none; }
   /* Zwei Textzonen: Forderung am unteren Rand des oberen Drittels, Erklärung am oberen Rand der unteren Hälfte des Bildes (so nah wie möglich beieinander) */
   .zone {
     position: absolute; left: 5cqw; right: 5cqw;   /* 5cqw = PAD im Skript */
@@ -164,7 +244,32 @@
       calc(var(--schatten-x) * var(--schatten-dir) * 0.11em) calc(var(--schatten-y) * var(--schatten-dir) * 0.11em) 0.15em rgb(0 0 0 / 0.5),
       0 0 0.3em rgb(0 0 0 / 0.3);
   }
+  /* Kategorie-Logo der fünf Leitforderungen (1205.svg bis 1209.svg, Zuordnung siehe KATEGORIE_LOGO im Skript): quadratisch, oben links im Bild.
+     Solange die SVG-Datei fehlt, steht an ihrer Stelle der Kategorie-Titel zweizeilig in Weiß, gesetzt wie die fett hervorgehobenen Wörter der Erklärung. */
+  .kat {
+    position: absolute; top: 4cqw; width: var(--kat-groesse); height: var(--kat-groesse);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    pointer-events: auto; cursor: pointer;   /* klickbar, obwohl die Textebene (.overlay) Klicks sonst durchlässt */
+  }
+  .kat:active { transform: scale(0.94); }
+  .kat:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 2px; }
+  .kat-links { left: 4cqw; }     /* Kategorie-Logo 1205–1209.svg */
+  .kat-rechts { right: 4cqw; }   /* Ecklogo 1210.svg auf allen Beiträgen (Ersatz: „NRW bezahlbar“) */
+  .kat img { width: 100%; height: 100%; object-fit: contain; }
+  .kat-hinweis { display: block; margin-top: 0.5em; font-size: 0.55em; font-weight: var(--body-weight); letter-spacing: 0.02em; }   /* kleiner Zusatz „Platzhalter“ unter dem Ersatztitel */
+  .kat-text {
+    font-family: var(--font-head); font-weight: var(--em-weight); font-size: var(--kat-schrift); line-height: 1.05; letter-spacing: -0.01em;
+    text-shadow:
+      calc(var(--schatten-x) * var(--schatten-dir) * 0.05em) calc(var(--schatten-y) * var(--schatten-dir) * 0.05em) 0 rgb(75 0 0 / 0.6),
+      calc(var(--schatten-x) * var(--schatten-dir) * 0.11em) calc(var(--schatten-y) * var(--schatten-dir) * 0.11em) 0.15em rgb(0 0 0 / 0.5),
+      0 0 0.3em rgb(0 0 0 / 0.3);
+  }
   .ln { display: block; white-space: nowrap; }
+  .ln:empty { display: none; }   /* Forderung mit nur zwei Wörtern: dritte Zeile bleibt leer */
+  /* Jede Forderung liegt zwei- und dreizeilig im HTML; fitText() entscheidet je Bild per Klasse head-3, welche Fassung sichtbar ist */
+  .head .v2, .head .v3 { width: max-content; margin-inline: auto; }   /* eigene Breite je Fassung, damit fitText() beide getrennt messen kann */
+  .head .v3, .head.head-3 .v2 { display: none; }
+  .head.head-3 .v3 { display: block; }
 
   .dots {
     display: flex; justify-content: center; gap: 0.95cqw;
@@ -245,15 +350,24 @@
     display: flex; align-items: center; justify-content: center;
     padding: max(20px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) max(20px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px));
     background: rgb(20 20 32 / 0.3);
-    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);   /* Stärke des Weichzeichners */
     overscroll-behavior: contain;
     opacity: 0; visibility: hidden;
-    transition: opacity 200ms ease, visibility 0s linear 200ms;
+    /* Weichzeichner nur, solange das Fenster offen ist (ein Blur über den ganzen Bildschirm kostet auf dem iPhone viel Arbeitsspeicher):
+       beim Öffnen sofort an, beim Schließen erst nach der Ausblendung (200 ms, wie visibility) wieder aus – die Optik bleibt gleich. */
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+    transition: opacity 200ms ease, visibility 0s linear 200ms, -webkit-backdrop-filter 0s linear 200ms, backdrop-filter 0s linear 200ms;
   }
+  .ki-overlay.open {
+    opacity: 1; visibility: visible; transition: opacity 200ms ease;
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);   /* Stärke des Weichzeichners */
+  }
+  /* Ersatz ohne Blur: halbtransparenter, dunklerer Hintergrund. Greift automatisch bei Browsern ohne backdrop-filter
+     und überall, wenn im Skript WEICHZEICHNER = false steht (setzt die Klasse ohne-weichzeichner an <html>). */
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    .ki-overlay { background: rgb(20 20 32 / 0.8); }   /* Ersatz ohne Blur-Unterstützung */
+    .ki-overlay { background: rgb(20 20 32 / 0.8); }
   }
-  .ki-overlay.open { opacity: 1; visibility: visible; transition: opacity 200ms ease; }
+  .ohne-weichzeichner .ki-overlay { background: rgb(20 20 32 / 0.8); }
+  .ohne-weichzeichner .ki-overlay.open { -webkit-backdrop-filter: none; backdrop-filter: none; }
   .ki-dialog {
     width: min(100%, 400px); max-height: 100%; overflow-y: auto;
     padding: 22px 20px 12px; border-radius: 20px;
@@ -284,6 +398,8 @@
   .ki-cancel { display: block; width: 100%; margin-top: 4px; padding: 12px; font-size: 14px; color: #777; }
 
   /* ---------- Export-Dialog (Symbol 1201.svg): nutzt Overlay, Dialog und Auswahlfelder des KI-Fensters ---------- */
+  .ex-gesperrt { opacity: .55; cursor: not-allowed; }
+  .ex-gesperrt small { color: #e0245e; opacity: 1; }
   .ex-go { width: 100%; }   /* .ki-go ist für einen Link gedacht, hier ein Button */
 
   /* ---------- Feedback-Dialog (Symbol 1202.svg): nutzt Overlay und Dialog des KI-Fensters ---------- */
@@ -296,27 +412,132 @@
   .fb-send { width: 100%; }
   .fb-send:disabled { opacity: 0.6; pointer-events: none; }
 
+  /* ---------- Suche (Symbol 1211.svg direkt links neben 1203.svg): nutzt Overlay und Dialog des KI-Fensters ---------- */
+  .act.such { margin-left: auto; }               /* übernimmt den Abstand nach rechts, den sonst 1203.svg hat */
+  .act.such + .act.save { margin-left: 0; }
+  .dot.treffer { outline: 0.3cqw solid var(--accent); outline-offset: 0.3cqw; }   /* Punkte der Bilder, die zur Suche passen */
+  .such-dialog { display: flex; flex-direction: column; width: min(100%, 560px); height: min(100%, 820px); overflow-y: auto; overscroll-behavior: contain; padding: 0 16px; }
+  /* Das ganze Fenster ist EIN Scrollbereich: Beim Runterscrollen der Treffer wandern Filter und Optionen nach oben hinaus,
+     Titel und Suchfeld bleiben oben stehen, „Im Feed zeigen“ bleibt unten stehen. */
+  .such-oben { position: sticky; top: 0; z-index: 2; margin: 0 -16px; padding: 16px 16px 10px; background: #fff; }
+  .such-kopf { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .such-kopf .ki-title { margin: 0; }
+  .such-x { flex: none; width: 36px; height: 36px; margin-right: -6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #555; }
+  .such-x:hover { background: #f2f2f5; }
+  .such-x svg { width: 18px; height: 18px; }
+  .such-feld { position: relative; margin-top: 10px; }
+  .such-feld img { position: absolute; left: 14px; top: 50%; width: 20px; height: 20px; margin-top: -10px; opacity: 0.55; pointer-events: none; }
+  .such-feld input { width: 100%; padding: 12px 14px 12px 44px; font: inherit; font-size: 16px; color: var(--text); border: 2px solid #e4e4ea; border-radius: 14px; background: #fff; -webkit-appearance: none; appearance: none; }   /* 16 px: iOS zoomt sonst ins Feld */
+  .such-feld input:focus { outline: none; border-color: var(--accent); }
+  .such-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  /* Themen der „Weiteren Forderungen“: aufklappbar; beim Tippen eines Suchbegriffs klappt der Bereich von selbst zu. */
+  .such-themen { flex-basis: 100%; margin-top: 2px; }
+  .such-themen summary { display: flex; align-items: center; gap: 6px; padding: 6px 0 2px; font-size: 13px; font-weight: 500; color: #3d46a8; cursor: pointer; list-style: none; }
+  .such-themen summary::-webkit-details-marker { display: none; }
+  .such-themen summary::before { content: ''; width: 7px; height: 7px; margin: 0 3px 0 2px; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(-45deg); transition: transform 150ms ease; }
+  .such-themen[open] summary::before { transform: rotate(45deg); }
+  .such-themen summary small { font-weight: 400; color: #8a8a94; font-variant-numeric: tabular-nums; }
+  .such-themen-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; padding: 2px 0 4px; }
+  .such-chip { padding: 6px 11px; border-radius: 999px; border: 1.5px solid #e4e4ea; background: #fff; font-size: 13px; line-height: 1.2; white-space: nowrap; }
+  .such-chip small { margin-left: 5px; font-size: 12px; color: #8a8a94; font-variant-numeric: tabular-nums; }
+  .such-chip[aria-pressed="true"] { border-color: var(--accent); background: #f1f2fe; color: #3d46a8; }
+  .such-chip[aria-pressed="true"] small { color: #3d46a8; }
+  .such-chip.leer { opacity: 0.45; }
+  .such-mehr { margin-top: 8px; font-size: 13px; color: #555; }
+  .such-mehr summary { padding: 4px 0; color: #3d46a8; font-weight: 500; cursor: pointer; }
+  .such-optionen { display: grid; gap: 8px; margin: 6px 0 4px; }
+  .such-optionen label { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .such-optionen select { max-width: 62%; padding: 6px 8px; font: inherit; font-size: 14px; color: var(--text); border: 1.5px solid #e4e4ea; border-radius: 10px; background: #fff; }
+  .such-optionen label.such-check { justify-content: flex-start; }
+  .such-check input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+  .such-hilfe { margin: 8px 0 4px; padding: 10px 12px 10px 28px; border-radius: 10px; background: #f6f6f9; line-height: 1.5; }
+  .such-hilfe code { padding: 1px 4px; border: 1px solid #e4e4ea; border-radius: 4px; background: #fff; font: 12px ui-monospace, Consolas, monospace; white-space: nowrap; }
+  .such-status { margin: 10px 0 6px; min-height: 1.3em; font-size: 13px; line-height: 1.4; color: #555; }
+  .such-hinweis { display: block; margin-top: 4px; color: #6b4e00; }
+  .such-liste { flex: 1 0 auto; margin: 0 -16px; padding: 0 16px; border-top: 1px solid #eee; }
+  .such-erg { scroll-margin: 120px 0 110px; display: block; width: 100%; padding: 10px 6px; text-align: left; border-bottom: 1px solid #f0f0f3; }
+  .such-erg:hover, .such-erg:focus-visible { background: #f6f6fc; outline: none; }
+  .such-meta { display: block; font-size: 11.5px; letter-spacing: 0.01em; color: #8a8a94; }
+  .such-head { display: block; margin-top: 2px; font-size: 15px; font-weight: 700; line-height: 1.3; }
+  .such-text { display: block; margin-top: 3px; font-size: 13px; line-height: 1.45; color: #555; }
+  .such-erg mark { padding: 0 1px; border-radius: 2px; background: #ffe58a; color: inherit; }
+  .such-weiter { display: block; width: 100%; padding: 12px; font-size: 14px; font-weight: 500; color: #3d46a8; }
+  .such-leer { padding: 18px 4px; font-size: 14px; line-height: 1.5; color: #777; }
+  .such-fuss { position: sticky; bottom: 0; z-index: 2; margin: 0 -16px; padding: 10px 16px 6px; background: #fff; border-top: 1px solid #eee; }
+  .such-fuss-zeile { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 18px; }
+  .such-link { padding: 10px 6px; font-size: 14px; color: #777; }
+  .such-link[hidden] { display: none; }
+  /* Leiste über dem Feed, solange eine Suche den Feed filtert (bleibt beim Scrollen oben stehen) */
+  .such-leiste { position: sticky; top: 0; z-index: 6; display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 12px; background: #f1f2fe; color: #3d46a8; font: 500 13px/1.35 var(--font-text); box-shadow: 0 1px 0 #dfe1fb; }
+  .such-leiste[hidden] { display: none; }
+  .such-leiste img { flex: none; width: 18px; height: 18px; opacity: 0.7; }
+  .such-leiste-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .such-leiste button { flex: none; padding: 6px 10px; border-radius: 14px; background: #fff; font-size: 13px; font-weight: 600; }
+
   @media (prefers-reduced-motion: reduce) {
     .ki-overlay, .ki-dialog { transition: none; }
     .act.like.pop img, .act.like.unpop img { animation: none; }
     .heart-burst { display: none; }
+    .sk::after, .lade::after { animation: none; }
   }
+
+  /* ---------- Platzhalter: stehen schon im HTML und erscheinen sofort, bevor die Beiträge geladen sind ---------- */
+  .sk { position: relative; overflow: hidden; display: block; background: #e6e6ea; border-radius: 6px; }
+  .sk::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+    transform: translateX(-100%); animation: sk-glanz 1.4s ease-in-out infinite;
+  }
+  @keyframes sk-glanz { to { transform: translateX(100%); } }
+  .sk-kreis { border-radius: 50%; }
+  .sk-story { flex: 0 0 calc(24.2 * var(--u)); width: calc(24.2 * var(--u)); height: calc(24.2 * var(--u)); }
+  .sk-avatar { width: 7.65cqw; height: 7.65cqw; flex: none; }
+  .sk-name { width: 28cqw; height: 3.1cqw; border-radius: 3px; }
+  .sk-slide { aspect-ratio: 4 / 5; background: var(--placeholder); }   /* gleiche Farbe wie beim Laden eines Beitragsbilds */
+  .sk-aktionen { display: flex; gap: 4.5cqw; padding: 3cqw 3.75cqw 0; }
+  .sk-aktion { width: 5.9cqw; height: 5.9cqw; }
+  .lade-hinweis { margin: 0; padding: 6cqw 5cqw; font-size: 3.1cqw; line-height: 4.4cqw; color: #6b6b75; text-align: center; }
 </style>
 </head>
 <body>
 
-<main class="app" id="app">
-  <section class="stories" id="stories" aria-label="Stories"></section>
-  <div id="feed"></div>
+<main class="app" id="app" aria-busy="true">
+  <div class="stories-wrap" id="stories-wrap">
+  <section class="stories" id="stories" aria-label="Stories">
+    <span class="sk sk-kreis sk-story"></span><span class="sk sk-kreis sk-story"></span><span class="sk sk-kreis sk-story"></span><span class="sk sk-kreis sk-story"></span>
+  </section>
+  </div>
+  <div id="feed">
+    <article class="post">
+      <header class="post-head">
+        <span class="sk sk-kreis sk-avatar"></span>
+        <span class="sk sk-name"></span>
+      </header>
+      <div class="slider-wrap"><div class="sk sk-slide"></div></div>
+      <div class="sk-aktionen">
+        <span class="sk sk-kreis sk-aktion"></span><span class="sk sk-kreis sk-aktion"></span><span class="sk sk-kreis sk-aktion"></span>
+      </div>
+    </article>
+    <p class="lade-hinweis" id="lade-hinweis" hidden>Die Beiträge werden geladen. Bei langsamer Verbindung kann das einen Moment dauern.</p>
+  </div>
 </main>
+<script>   // Breite der Scrollleiste als --sb, damit der Header im Querformat genau die sichtbare Breite füllt
+  // Nur bei echter Änderung schreiben: Jeder Schreibvorgang lässt den Browser die ganze Seite neu berechnen und den Header
+  // neu zeichnen – auf iPad/iPhone feuert resize beim Scrollen ständig (Adressleiste fährt ein und aus), dort ist der Wert immer 0.
+  { let alt = '0px'; const sb = () => { const w = (innerWidth - document.documentElement.clientWidth) + 'px'; if (w !== alt) { alt = w; document.documentElement.style.setProperty('--sb', w); } }; sb(); addEventListener('resize', sb); if (window.ResizeObserver) new ResizeObserver(sb).observe(document.documentElement); }   // ResizeObserver: Scrollleiste erscheint erst, wenn die Beiträge geladen sind
+</script>
+<script>setTimeout(() => { const h = document.getElementById('lade-hinweis'); if (h) h.hidden = false; }, 8000);</script>
 
-<script src="forderungen.js"></script>
-<script src="feed-order.js"></script>
-<script src="herz-start.js"></script>
+<!-- defer: der Browser zeichnet die Platzhalter, während die Daten laden; die Reihenfolge bleibt erhalten -->
+<script src="forderungen.js" defer></script>
+<script src="feed-order.js" defer></script>
+<script src="wahlprogramm-dateien.js" defer></script>
+<script src="herz-gruppen.js" defer></script>
 
 <script>
-/* Diagnose: meldet Bilder, die nicht geladen werden konnten (später entfernen) */
-(() => {
+/* Diagnose: meldet Bilder, die nicht geladen werden konnten. Vorläufig aus (DIAG_AN = true zum Einschalten) */
+const DIAG_AN = false;
+if (DIAG_AN) (() => {
   const missing = new Set();
   let box, firstUrl;
   document.addEventListener('error', e => {
@@ -330,28 +551,36 @@
   }, true);
 })();
 
+// Alles Weitere läuft, sobald die Daten-Dateien (defer) geladen sind und das HTML fertig ist.
+document.addEventListener('DOMContentLoaded', () => {
+
 /* =====================  Konfiguration (hier später echte Daten eintragen)  ===================== */
+
+// Weichzeichner hinter den Fenstern (KI, Export, Feedback, Suche). false = halbtransparenter dunkler Hintergrund ohne Blur
+// (spart auf schwachen Geräten Arbeitsspeicher; Darstellung siehe .ohne-weichzeichner im CSS).
+const WEICHZEICHNER = true;
+document.documentElement.classList.toggle('ohne-weichzeichner', !WEICHZEICHNER);
 
 // 18 Story-Einträge: Bild, Name (Caption) und Instagram-Profil (ohne @). Klick öffnet das Profil.
 const STORIES = [
-  { img: '1101.jpg', name: 'Die Linke NRW',            handle: 'dielinkenrw' },
-  { img: '1102.jpg', name: 'Alexandra Mehdi',          handle: 'alexandramehdi' },
-  { img: '1103.jpg', name: 'Sebastian Merkens',        handle: 'sebastian_merkens' },
-  { img: '1104.jpg', name: 'Sonja Baumann',            handle: 'dielinkesonja' },
-  { img: '1105.jpg', name: 'Nils Böhlke',              handle: 'nilsboehlke' },
-  { img: '1106.jpg', name: 'Sarah Niknamtavin',        handle: 'kampfundkajal' },
-  { img: '1107.jpg', name: 'Batıkağan Pulat',          handle: 'batikaganpulat' },
-  { img: '1108.jpg', name: 'Katharina Grudin',         handle: 'katharina.grudin' },
-  { img: '1109.jpg', name: 'Halil Izci',               handle: 'halil_izci_' },
-  { img: '1110.jpg', name: 'Stephanie Nordmann',       handle: 'stephanie.nordmann_die.linke' },
-  { img: '1111.jpg', name: 'Luisa Reyes',              handle: 'dielinkeluisa' },
-  { img: '1112.jpg', name: 'Stefanie Bilinski',        handle: 'steffi_alfter' },
-  { img: '1113.jpg', name: 'Markus Korporal',          handle: 'korporalundwiese' },
-  { img: '1114.jpg', name: 'Franziska von Neumann',    handle: 'franzi.vonneumann' },
-  { img: '1115.jpg', name: 'Selmar Ibrahimovic',       handle: 'selmar.ibra' },
-  { img: '1116.jpg', name: 'Enrica Harting',           handle: 'dielinke.enrica' },
-  { img: '1117.jpg', name: 'Jacob Bohé',               handle: 'jacobbohe' },
-  { img: '1118.jpg', name: 'Maryam Barry',             handle: 'maryam.macht.politik' },
+  { img: '1101.webp', name: 'Die Linke NRW',            handle: 'dielinkenrw' },
+  { img: '1102.webp', name: 'Alexandra Mehdi',          handle: 'alexandramehdi' },
+  { img: '1103.webp', name: 'Sebastian Merkens',        handle: 'sebastian_merkens' },
+  { img: '1104.webp', name: 'Sonja Baumann',            handle: 'dielinkesonja' },
+  { img: '1105.webp', name: 'Nils Böhlke',              handle: 'nilsboehlke' },
+  { img: '1106.webp', name: 'Sarah Niknamtavin',        handle: 'kampfundkajal' },
+  { img: '1107.webp', name: 'Batıkağan Pulat',          handle: 'batikaganpulat' },
+  { img: '1108.webp', name: 'Katharina Grudin',         handle: 'katharina.grudin' },
+  { img: '1109.webp', name: 'Halil Izci',               handle: 'halil_izci_' },
+  { img: '1110.webp', name: 'Stephanie Nordmann',       handle: 'stephanie.nordmann_die.linke' },
+  { img: '1111.webp', name: 'Luisa Reyes',              handle: 'dielinkeluisa' },
+  { img: '1112.webp', name: 'Stefanie Bilinski',        handle: 'steffi_alfter' },
+  { img: '1113.webp', name: 'Markus Korporal',          handle: 'korporalundwiese' },
+  { img: '1114.webp', name: 'Franziska von Neumann',    handle: 'franzi.vonneumann' },
+  { img: '1115.webp', name: 'Selmar Ibrahimovic',       handle: 'selmar.ibra' },
+  { img: '1116.webp', name: 'Enrica Harting',           handle: 'dielinke.enrica' },
+  { img: '1117.webp', name: 'Jacob Bohé',               handle: 'jacobbohe' },
+  { img: '1118.webp', name: 'Maryam Barry',             handle: 'maryam.macht.politik' },
 ];
 
 /* ---------- Verlauf-Effekt je Bild ----------
@@ -565,6 +794,11 @@ const VERLAUF = {
   '179.jpg': 'ecke-lu-ro',
   '180.jpg': 'oben-unten',
 };
+// Ordner der Hintergrundbilder der Beiträge. forderungen.js enthält nur Dateinamen (0001.jpg …), der Pfad entsteht hier.
+// Der Feed lädt die kleinere WebP-Fassung (0001.jpg → Hintergrundbilder/0001.webp, erzeugt von bilder_webp.py).
+// export_thesen.py beantwortet diese Adresse mit der PNG- bzw. JPG-Vorlage, die Exportbilder bleiben also verlustfrei.
+const HINTERGRUND_ORDNER = 'Hintergrundbilder/';
+const hintergrundUrl = img => HINTERGRUND_ORDNER + String(img).replace(/\.jpe?g$/i, '.webp');
 const verlaufVon = img => VERLAUF[String(img).split('?')[0].split('/').pop()] || VERLAUF_STANDARD;
 { // Plausibilitätsprüfung (Meldung nur in der Browser-Konsole)
   const falsch = Object.entries(VERLAUF).filter(([, m]) => !VERLAUF_MODI.includes(m));
@@ -573,11 +807,13 @@ const verlaufVon = img => VERLAUF[String(img).split('?')[0].split('/').pop()] ||
 
 // Beiträge: Zuordnung und Reihenfolge kommen aus feed-order.js, Inhalte aus forderungen.js (Pflege über build.py)
 const BY_NR = new Map(FORDERUNGEN.map(f => [f.nr, f]));
-const POSTS = FEED_ORDER.map(nrs => ({
+const POSTS = FEED_ORDER.map((nrs, gruppe) => ({
   id: 'p' + nrs[0],   // stabile ID für den Herzen-Zähler: erste Forderungs-Nummer des Beitrags
+  gruppe,             // Index der Fünfergruppe in FEED_ORDER (für die Dateinamen der fertig gesetzten Bilder)
   slides: nrs.map(nr => BY_NR.get(nr)).filter(Boolean),
+  kategorie: (BY_NR.get(nrs[0]) || {}).sektion,   // Kategorie der Fünfergruppe = Kategorie ihrer Leitforderung (erste Nummer); gilt für alle Bilder des Beitrags, auch für Forderungen, die mehrfach vorkommen
   user: 'dielinkenrw',
-  avatar: '1101.jpg',
+  avatar: '1101.webp',
   shared: 0,   // Teilen-Klicks für die Reihenfolge (Zählung noch nicht angebunden)
   actions: [
     { icon: '1200.svg', iconOn: '1200-aktiv.svg', label: 'Gefällt mir', count: 397, action: 'like' },   // Klick: Herz füllt sich (1200-aktiv.svg), Zahl +1
@@ -588,24 +824,46 @@ const POSTS = FEED_ORDER.map(nrs => ({
   more: { icon: '1204.svg', label: 'KI-Assistent öffnen' },   // fünftes Symbol, rechtsbündig hinter 1203.svg; öffnet das KI-Overlay
 }));
 
+/* ---------- Dateinamen der fertig gesetzten Bilder (Export „Ganzer Beitrag“) ----------
+   export_thesen.py erzeugt die Bilder mit genau diesen Namen (es ruft exportAuftrag() über window.LINKSINSTA_EXPORT auf),
+   die Seite verwendet sie im Export-Dialog. Seite und Dateien bleiben so automatisch im Gleichklang.
+     forderung-0123     Forderung mit dem Logo ihrer Kategorie (bzw. der Kategorie ihrer Gruppe, wenn sie nur in Gruppen einer Kategorie steht)
+     forderung-0123a/b nur bei Forderungen, die in Fünfergruppen verschiedener Kategorien stehen: je Kategorie eine Fassung
+                       mit deren Logo und Verlauf; Buchstaben in der Reihenfolge des ersten Vorkommens in feed-order.js */
+const BUCHSTABEN = 'abcdefghijklmnopqrstuvwxyz';
+const KAT_GRUPPEN = new Map();   // Forderungsnummer → Map(Kategorie → erste Gruppe dieser Kategorie)
+FEED_ORDER.forEach((nrs, gruppe) => {
+  const kat = (BY_NR.get(nrs[0]) || {}).sektion;
+  nrs.forEach(nr => {
+    if (!KAT_GRUPPEN.has(nr)) KAT_GRUPPEN.set(nr, new Map());
+    if (!KAT_GRUPPEN.get(nr).has(kat)) KAT_GRUPPEN.get(nr).set(kat, gruppe);
+  });
+});
+// Dateiname (ohne Endung) des Bildes, das die Forderung nr im Beitrag der Gruppe gruppe zeigt
+function exportName(nr, gruppe) {
+  const basis = 'forderung-' + String(nr).padStart(4, '0');
+  const kats = KAT_GRUPPEN.get(nr);
+  if (!kats || kats.size < 2 || gruppe == null) return basis;
+  const i = [...kats.keys()].indexOf((BY_NR.get(FEED_ORDER[gruppe][0]) || {}).sektion);
+  return i < 0 ? basis : basis + BUCHSTABEN[i];
+}
+// Alle Bilder einer Forderung für export_thesen.py: [{ name, gruppe }] (gruppe null = Logo der eigenen Kategorie)
+function exportAuftrag(nr) {
+  const basis = exportName(nr, null), kats = KAT_GRUPPEN.get(nr);
+  if (!kats) return [{ name: basis, gruppe: null }];
+  const gruppen = [...kats.values()];
+  if (gruppen.length === 1) return [{ name: basis, gruppe: gruppen[0] }];
+  return [{ name: basis, gruppe: null }, ...gruppen.map(g => ({ name: exportName(nr, g), gruppe: g }))];
+}
+
 /* Schlüssel des Herzen-Speichers im Browser (Details im Abschnitt „Gefällt mir“ weiter unten) */
 const HK = { token: 'herzen.token', mine: 'herzen.mine', counts: 'herzen.counts' };
 
-// Startwerte: herz-start.js enthält einen Wert je Forderung (Schlüssel 'p' + Nummer der Forderung).
-// Der Startwert eines Beitrags ist der Mittelwert seiner Forderungen, danach über alle Beiträge auf 11 bis 199 gestreckt,
-// damit die Reihenfolge ihre Spannweite behält. Angezeigt wird: Startwert + vom Server gezählte Herzen.
-// Fehlt die Datei, starten alle Beiträge bei 0. Der Zähler selbst gehört dem ganzen Beitrag (ID = 'p' + erste Forderungs-Nummer).
-const START = (() => {
-  const fs = typeof HERZ_START === 'undefined' ? {} : HERZ_START;
-  const mean = p => {
-    const v = p.slides.map(s => fs['p' + s.nr]).filter(x => x != null);
-    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
-  };
-  const m = POSTS.map(mean), known = m.filter(x => x != null);
-  const lo = Math.min(...known), hi = Math.max(...known);
-  return Object.fromEntries(POSTS.map((p, i) => [p.id,
-    m[i] == null ? 0 : hi > lo ? Math.round(11 + (m[i] - lo) / (hi - lo) * 188) : Math.round(m[i])]));
-})();
+// Startwerte: herz-gruppen.js enthält einen Wert je 5er-Gruppe (Schlüssel 'p' + Nummer der Auftakt-Forderung = Beitrags-ID).
+// Der Wert wird unverändert übernommen (11 bis 199). Angezeigt wird: Startwert + vom Server gezählte Herzen.
+// Fehlt die Datei oder ein Eintrag, startet der Beitrag bei 0. Der Zähler selbst gehört dem ganzen Beitrag (ID = 'p' + erste Forderungs-Nummer).
+const START = Object.fromEntries(POSTS.map(p => [p.id,
+  typeof HERZ_GRUPPEN === 'undefined' ? 0 : (HERZ_GRUPPEN[p.id] ?? 0)]));
 
 const store = {
   get: (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
@@ -615,7 +873,7 @@ const store = {
 /* =====================  Reihenfolge der Beiträge  =====================
    Bei jedem Seitenaufruf bekommt jeder Beitrag eine eigene Zufallszahl c (gleichverteilt zwischen 0,5 und 2).
    Wert = c * (Herzen + 10 * geteilt); die Beiträge werden von groß nach klein sortiert.
-   Herzen = Startwert aus herz-start.js + zuletzt bekannte, vom Server gezählte Herzen (also die Zahl, die unter dem Beitrag steht).
+   Herzen = Startwert aus herz-gruppen.js + zuletzt bekannte, vom Server gezählte Herzen (also die Zahl, die unter dem Beitrag steht).
    Geteilt (p.shared) steht aktuell bei allen Beiträgen auf 0, die Zählung ist noch nicht angebunden.
    Bei gleichem Wert bleibt die Reihenfolge aus feed-order.js erhalten. */
 const RANK = { cMin: 0.5, cMax: 2, sharedWeight: 10 };
@@ -646,67 +904,177 @@ const SHARE = { url: 'https://www.dielinke-nrw.de/landesverband/landtagswahl-202
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 /* ---------- Story-Karussell als Endlos-Loop ----------
-   Die 20 Stories werden mehrfach hintereinander gerendert. Der Inhalt wiederholt sich exakt
-   nach einer festen Breite (W). Nähert man sich einem Rand, wird die Scrollposition unsichtbar
-   um ein Vielfaches von W verschoben – so lässt sich in beide Richtungen endlos scrollen. */
-const STORY_SETS = 5;   // Anzahl der Kopien (ungerade, mindestens 3)
+   Ohne das eingebaute Scrollen des Browsers: Safari auf dem iPad zeichnet einen scrollbaren Bereich nach Sprüngen
+   der Scrollposition erst nach ~0,5 s neu (Leiste kurz weiß). Stattdessen liegt jede Story auf einer eigenen kleinen
+   Grafikebene (will-change: transform), die nur noch verschoben, nie neu gezeichnet wird. Läuft eine Story links
+   hinaus, wird sie rechts wieder angehängt (und umgekehrt) – dort ist sie nicht zu sehen, es gibt also keinen Sprung.
+   Bedienung: Wischen mit Schwung (Finger/Stift), waagerechtes Mausrad/Trackpad, Pfeil-Buttons, Tab-Taste.
+   Senkrechtes Wischen bleibt beim Browser (touch-action: pan-y) und scrollt wie gewohnt die Seite. */
+// Pfeil-Symbole der Maus-Buttons (Header und Beiträge; sichtbar nur bei Maus, siehe CSS .pfeil)
+const pfeilSVG = d => `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const PFEIL_L = pfeilSVG('M10 3 5 8l5 5'), PFEIL_R = pfeilSVG('m6 3 5 5-5 5');
 
 const storiesEl = document.getElementById('stories');
-storiesEl.innerHTML = Array.from({ length: STORY_SETS }, () => STORIES).flat().map(s => `
+let storyBewegtBis = 0;   // Zeitpunkt (performance.now), bis zu dem der Feed-Aufbau pausiert – das Karussell wird gerade bewegt
+const storyHTML = s => `
   <a class="story" href="https://www.instagram.com/${encodeURIComponent(s.handle)}/" target="_blank" rel="noopener noreferrer" draggable="false" aria-label="${esc(s.name)} auf Instagram öffnen">
     <div class="story-ring"><div class="story-gap"><img src="${esc(s.img)}" alt="" draggable="false"></div></div>
     <div class="story-name">${esc(s.name)}</div>
-  </a>`).join('');
+  </a>`;
 
 (() => {
   const el = storiesEl;
-  const items = el.querySelectorAll('.story');
-  const n = STORIES.length;
-  const mid = Math.floor(STORY_SETS / 2);
-  let W = 0, timer = 0, touching = false;
+  const ruhig = matchMedia('(prefers-reduced-motion: reduce)');
+  let items = [], kopien = 0;
+  let schritt = 0, P = 0, x0 = 0;   // Abstand zweier Storys, Länge einer Runde, Lage der ersten Story ohne Verschiebung
+  let o = 0;                        // Verschiebung (px): wächst beim Wischen nach links
 
-  const measure = () => { W = items[n].offsetLeft - items[0].offsetLeft; };   // Breite einer Kopie
-  const wrap = x => W * mid + ((((x - W * mid) % W) + W) % W);               // x in die mittlere Kopie falten
-
-  // Direkt umspringen, falls ein Rand fast erreicht ist (z. B. bei schnellem Wischen)
-  const guard = () => {
-    const x = el.scrollLeft, max = el.scrollWidth - el.clientWidth;
-    if (x < W * 0.5) el.scrollLeft = x + W * mid;
-    else if (x > max - W * 0.5) el.scrollLeft = x - W * mid;
+  // Zeichnen: jede Story an ihren Platz in der Runde falten; der Bereich beginnt eine Story vor dem linken Rand
+  const zeichnen = () => {
+    if (!P) return;
+    storyBewegtBis = performance.now() + 400;
+    for (let i = 0; i < items.length; i++) {
+      const natur = x0 + i * schritt;
+      const p = ((natur - o + schritt) % P + P) % P - schritt;
+      items[i].style.transform = `translate3d(${(p - natur).toFixed(2)}px,0,0)`;
+    }
   };
 
-  // Wenn Ruhe herrscht: zurück in die Mitte, damit immer weit genug Platz in beide Richtungen bleibt
-  const recenter = () => {
-    const x = el.scrollLeft, nx = wrap(x);
-    if (Math.abs(nx - x) > 1) el.scrollLeft = nx;
+  // So viele Kopien der Liste, dass die Runde breiter ist als die Leiste plus zwei Storys (sonst entstünden Lücken).
+  // Handy, iPad, üblicher Desktop: eine Kopie (18 Storys); sehr breite Bildschirme: mehr.
+  const messen = () => {
+    if (!items.length) { el.innerHTML = STORIES.map(storyHTML).join(''); items = [...el.children]; kopien = 1; }
+    items.forEach(it => { it.style.transform = ''; });
+    schritt = items.length > 1 ? items[1].offsetLeft - items[0].offsetLeft : items[0].offsetWidth;
+    const noetig = Math.max(1, Math.ceil((el.clientWidth + 2 * schritt) / (STORIES.length * schritt)));
+    if (noetig !== kopien) {
+      kopien = noetig;
+      el.innerHTML = Array.from({ length: kopien }, () => STORIES).flat().map(storyHTML).join('');
+      items = [...el.children];
+    }
+    x0 = items[0].offsetLeft;
+    P = items.length * schritt;
+    zeichnen();
   };
-  const schedule = () => {
-    clearTimeout(timer);
-    timer = setTimeout(() => { if (!touching) recenter(); }, 150);
+  const neuMessen = () => { const phase = schritt ? o / schritt : 0; stopp(); messen(); o = phase * schritt; zeichnen(); };
+
+  // ---- Bewegung: Ausrollen nach dem Wischen und weiche Fahrt für Pfeile/Fokus ----
+  let raf = 0, v = 0, ziel = null, fahrtStart = 0, fahrtVon = 0, fahrtDauer = 0, letzteZeit = 0;
+  const stopp = () => { cancelAnimationFrame(raf); raf = 0; v = 0; ziel = null; };
+  const schleife = t => {
+    if (ziel !== null) {                                   // Fahrt zu einem Ziel (Pfeile, Fokus)
+      const k = Math.min(1, Math.max(0, (t - fahrtStart) / fahrtDauer));
+      o = fahrtVon + (ziel - fahrtVon) * (1 - Math.pow(1 - k, 3));
+      zeichnen();
+      if (k < 1) { raf = requestAnimationFrame(schleife); return; }
+      ziel = null; raf = 0; return;
+    }
+    const dt = Math.min(40, Math.max(0, t - letzteZeit)); letzteZeit = t;   // Ausrollen wie in iOS: Tempo nimmt stetig ab
+    // Abbremsen: 0.9965 je ms – ein schneller Wisch rollt gut eine Sekunde aus (0.998 wie bei iOS wirkte hier zu lang und
+    // zäh); Schluss, sobald kaum noch Bewegung zu sehen ist (unter 0,05 px/ms ≈ 1 px pro Bild), statt lange nachzukriechen
+    o += v * dt; v *= Math.pow(0.9965, dt);
+    zeichnen();
+    if (Math.abs(v) > 0.05) raf = requestAnimationFrame(schleife); else { v = 0; raf = 0; }
+  };
+  const ausrollen = tempo => {
+    stopp(); v = tempo;
+    if (Math.abs(v) <= 0.05 || ruhig.matches) { v = 0; return; }
+    letzteZeit = performance.now(); raf = requestAnimationFrame(schleife);
+  };
+  const fahren = (um, dauer = 380) => {
+    const von = ziel !== null ? ziel : o;               // schnelle Klickfolge: vom bisherigen Ziel aus weiter
+    stopp();
+    if (ruhig.matches) { o = von + um; zeichnen(); return; }
+    fahrtVon = o; ziel = von + um; fahrtStart = performance.now(); fahrtDauer = dauer;
+    raf = requestAnimationFrame(schleife);
   };
 
-  el.addEventListener('scroll', () => { guard(); schedule(); }, { passive: true });
-  el.addEventListener('touchstart', () => { touching = true; }, { passive: true });
-  const release = () => { touching = false; schedule(); };
-  el.addEventListener('touchend', release, { passive: true });
-  el.addEventListener('touchcancel', release, { passive: true });
+  let rafZ = 0;
+  const zeichnenBald = () => { if (!rafZ) rafZ = requestAnimationFrame(() => { rafZ = 0; zeichnen(); }); };
 
-  // Bei Größenänderung (Drehen, Fenster) die Position innerhalb der Wiederholung beibehalten
-  window.addEventListener('resize', () => {
-    const phase = W ? ((((el.scrollLeft - W * mid) % W) + W) % W) / W : 0;
-    measure();
-    el.scrollLeft = W * mid + phase * W;
+  // ---- Wischen (Finger, Stift) ----
+  let zeiger = null, startX = 0, startY = 0, startO = 0, gezogen = false, gestoppt = false, proben = [];
+  el.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' || zeiger !== null) return;
+    gestoppt = !!raf;                                    // Antippen während des Ausrollens hält nur an, öffnet kein Profil
+    stopp();
+    zeiger = e.pointerId; startX = e.clientX; startY = e.clientY; startO = o; gezogen = false;
+    proben = [{ t: e.timeStamp, x: e.clientX }];
+  });
+  el.addEventListener('pointermove', e => {
+    if (e.pointerId !== zeiger) return;
+    const dx = e.clientX - startX;
+    if (!gezogen && Math.abs(dx) > 6 && Math.abs(dx) > Math.abs(e.clientY - startY)) {
+      gezogen = true;
+      try { el.setPointerCapture(zeiger); } catch {}
+    }
+    if (!gezogen) return;
+    o = startO - dx; zeichnenBald();   // höchstens einmal pro Bild zeichnen, auch wenn mehrere Bewegungen eintreffen
+    proben.push({ t: e.timeStamp, x: e.clientX });
+    while (proben.length > 2 && e.timeStamp - proben[0].t > 100) proben.shift();
+  });
+  const loslassen = e => {
+    if (e.pointerId !== zeiger) return;
+    zeiger = null;
+    if (!gezogen) return;
+    cancelAnimationFrame(rafZ); rafZ = 0; zeichnen();
+    const a = proben[0], b = proben[proben.length - 1];
+    const ruhte = e.timeStamp - b.t > 60;                // Finger zuletzt still gehalten: kein Schwung
+    ausrollen(!ruhte && b.t > a.t ? -(b.x - a.x) / (b.t - a.t) : 0);
+  };
+  el.addEventListener('pointerup', loslassen);
+  el.addEventListener('pointercancel', loslassen);       // z. B. der Browser übernimmt senkrechtes Scrollen
+  // Nach dem Wischen (oder Anhalten) kein Profil öffnen
+  el.addEventListener('click', e => {
+    if (gezogen || gestoppt) { e.preventDefault(); e.stopPropagation(); }
+    gezogen = gestoppt = false;
+  }, true);
+
+  // ---- Mausrad / Trackpad: nur waagerechte Bewegung, senkrecht scrollt weiter die Seite ----
+  el.addEventListener('wheel', e => {
+    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+    e.preventDefault();
+    stopp();
+    o += e.deltaX * (e.deltaMode === 1 ? 16 : 1); zeichnen();
+  }, { passive: false });
+
+  // ---- Tastatur: per Tab erreichte Story vollständig ins Bild holen ----
+  el.addEventListener('focusin', e => {
+    const it = e.target.closest('.story'); if (!it) return;
+    el.scrollLeft = 0;                                   // der Browser soll nichts selbst verschieben
+    const r = it.getBoundingClientRect(), box = el.getBoundingClientRect();
+    if (r.left < box.left) fahren(r.left - box.left - schritt / 2);
+    else if (r.right > box.right) fahren(r.right - box.right + schritt / 2);
   });
 
-  measure();
-  el.scrollLeft = W * mid;   // Start: erste Story der mittleren Kopie ganz links
+  // Größenänderung (Drehen, Fenster): Position in Storys beibehalten. Nur bei geänderter Breite – auf iPad/iPhone
+  // ändert sich beim Scrollen ständig die Höhe (Adressleiste).
+  let breiteVorher = innerWidth;
+  window.addEventListener('resize', () => {
+    if (innerWidth === breiteVorher) return;
+    breiteVorher = innerWidth;
+    neuMessen();
+  });
+
+  // Pfeil-Buttons für die Maus: blättern um so viele ganze Kandidaten, wie sichtbar sind (abzüglich einem, damit man sich orientieren kann).
+  const wrapEl = el.parentElement;   // .stories-wrap
+  wrapEl.insertAdjacentHTML('beforeend',
+    `<button class="pfeil pfeil-l" type="button" aria-label="Vorherige Kandidat*innen">${PFEIL_L}</button>` +
+    `<button class="pfeil pfeil-r" type="button" aria-label="Weitere Kandidat*innen">${PFEIL_R}</button>`);
+  const blaettern = dir => fahren(dir * Math.max(1, Math.floor(el.clientWidth / schritt) - 1) * schritt);
+  wrapEl.querySelector('.pfeil-l').addEventListener('click', () => blaettern(-1));
+  wrapEl.querySelector('.pfeil-r').addEventListener('click', () => blaettern(1));
+
+  messen();   // Start: erste Story ganz links
+  if (document.fonts) document.fonts.ready.then(neuMessen);   // Maße können sich mit den Schriften noch ändern
 })();
 
 /* ---------- Text auf den Bildern ----------
    Alle Größen in cqw (1 % der App-Breite). */
 const PAD = 5;               // seitlicher Rand der Textfläche (muss zum .overlay-Padding passen)
 const HEAD_MAX = 14.3;        // größte erlaubte Schriftgröße der Forderung (zweizeilig)
-const HEAD_LINES = 2;        // Forderung: immer zweizeilig
+const HEAD_MIN = 7.07;        // kleinste gewünschte Größe zweizeilig (≈ 10 % unter „Flächendeckendes Radwegenetz aufbauen“ mit 7,86); darunter wird dreizeilig gesetzt
+const HEAD_MAX_3 = HEAD_MAX * 2 / 3;   // größte Schriftgröße dreizeilig: der Block wird so nie höher als eine zweizeilige Forderung in Maximalgröße
 const SEMI_BONUS = 10;       // Strichpunkt gilt als bevorzugte Umbruchstelle, wenn er bis ca. 10 Zeichen neben dem Ideal liegt
 
 // Text in genau n möglichst gleich lange Zeilen teilen (nur an Leerzeichen; Optimierung per Dynamischer Programmierung)
@@ -738,27 +1106,68 @@ const bodyText = t => t
 const bodyHTML = t => esc(bodyText(t)).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');   // **Wort** wird fett (nach dem Maskieren, einzelne * wie in „Schüler*innen“ bleiben unverändert)
 const linesHTML = (t, n) => splitLines(t, n).map(l => `<span class="ln">${esc(l)}</span>`).join('');
 
-const slideHTML = (f, lazy, verlauf) => `
-        <div class="slide" data-nr="${esc(f.nr)}" data-verlauf="${esc(verlauf)}">
-          <img src="${esc(f.img)}" alt="" draggable="false" ${lazy ? 'loading="lazy"' : ''} decoding="async">
+/* ---------- Kategorie-Logo der fünf Leitforderungen ----------
+   Schlüssel = Feld „sektion“ in forderungen.js, und zwar das der Leitforderung des Beitrags (p.kategorie): Eine mehrfach verwendete Forderung
+   trägt so immer das Logo der Fünfergruppe, in der sie gerade steht. Beiträge unter „Weitere Forderungen“ bekommen kein Logo.
+   Jede Logo-Datei wird einmal beim Start geprüft: Lädt sie, zeigen alle Bilder dieser Kategorie das Logo (auch schon gerenderte);
+   fehlt sie, bleibt der Titel zweizeilig in weißer Schrift stehen. So entsteht pro Logo nur eine einzige Anfrage. */
+const KATEGORIE_LOGO = {
+  'Gute Löhne':         { logo: '1205.svg', zeilen: ['Gute', 'Löhne'] },
+  'Mobilität für alle': { logo: '1206.svg', zeilen: ['Mobilität', 'für alle'] },
+  'Mieten deckeln':     { logo: '1207.svg', zeilen: ['Mieten', 'deckeln'] },
+  'Gesundheit vor Ort': { logo: '1208.svg', zeilen: ['Gesundheit', 'vor Ort'] },
+  'Tax the Rich':       { logo: '1209.svg', zeilen: ['Tax the', 'Rich'] },
+};
+// Ecklogo oben rechts auf jedem Bild aller Beiträge (gleiche Größe und gleicher Ersatztext-Mechanismus wie die Kategorie-Logos)
+const ECK_LOGO = { logo: '1210.svg', zeilen: ['NRW', 'bezahlbar'], label: 'NRW bezahlbar' };
+const LOGO_DA = new Set();   // Logo-Dateien, die erfolgreich geladen wurden
+const katInnen = k => LOGO_DA.has(k.logo)
+  ? `<img src="${esc(k.logo)}" alt="" draggable="false">`
+  : `<span class="kat-text">${k.zeilen.map(z => `<span class="ln">${esc(z)}</span>`).join('')}<span class="kat-hinweis">Platzhalter</span></span>`;
+// Klickbar (Auswertung siehe „Filtern über die Logos“ am Ende): data-filter = Kategorie bzw. leer für „alle Beiträge“
+const logoHTML = (k, label, seite, filter) => `<div class="kat kat-${seite}" data-logo="${esc(k.logo)}" data-filter="${esc(filter)}" role="button" tabindex="0" aria-label="${esc(label)}">${katInnen(k)}</div>`;
+const katHTML = sektion => {
+  const k = KATEGORIE_LOGO[sektion];
+  return k ? logoHTML(k, `Nur Beiträge zu „${sektion}“ zeigen`, 'links', sektion) : '';
+};
+const eckHTML = () => logoHTML(ECK_LOGO, 'Alle Beiträge zeigen', 'rechts', '');
+[...Object.values(KATEGORIE_LOGO), ECK_LOGO].forEach(k => {
+  const probe = new Image();
+  probe.onload = () => {
+    LOGO_DA.add(k.logo);
+    document.querySelectorAll(`.kat[data-logo="${k.logo}"]`).forEach(el => { el.innerHTML = katInnen(k); });
+  };
+  probe.src = k.logo;   // bei Fehler (Datei fehlt) passiert nichts: der Titel bleibt
+});
+
+// kategorie: die des Beitrags (ohne Angabe, z. B. im Export-Skript: die der Forderung selbst)
+// virtuell: Bildadresse nur in data-src; das src setzt erst die Speicherverwaltung des Feeds („Bilder nur in der Nähe laden“).
+// Ohne Angabe (Export-Skript) bekommt das Bild sofort sein src.
+const slideHTML = (f, lazy, verlauf, kategorie = f.sektion, virtuell = false) => `
+        <div class="slide${virtuell ? ' wartet' : ''}" data-nr="${esc(f.nr)}" data-verlauf="${esc(verlauf)}">
+          <img ${virtuell ? 'data-src' : 'src'}="${esc(hintergrundUrl(f.img))}" alt="" draggable="false" ${lazy ? 'loading="lazy"' : ''} decoding="async">
           <div class="overlay">
-            <div class="zone zone-head"><div class="head">${linesHTML(f.head, HEAD_LINES)}</div></div>
+            ${eckHTML()}
+            ${katHTML(kategorie)}
+            <div class="zone zone-head"><div class="head"><div class="v2">${linesHTML(f.head, 2)}</div><div class="v3">${linesHTML(f.head, 3)}</div></div></div>
             <div class="zone zone-body"><p class="body">${bodyHTML(f.text)}</p></div>
-          </div>
+          </div>${virtuell ? '\n          <div class="lade" aria-hidden="true"></div>' : ''}
         </div>`;
 
-document.getElementById('feed').innerHTML = POSTS.map((p, pi) => `
-  <article class="post">
+const postHTML = (p, pi) => `
+  <article class="post" data-gruppe="${esc(p.gruppe)}">
     <header class="post-head">
       <a class="post-avatar-link" href="https://www.instagram.com/${encodeURIComponent(p.user)}/" target="_blank" rel="noopener noreferrer" draggable="false" aria-label="${esc(p.user)} auf Instagram öffnen">
-        <img class="post-avatar" src="${esc(p.avatar)}" alt="" draggable="false">
+        <img class="post-avatar" src="${esc(p.avatar)}" alt="" draggable="false" loading="lazy" decoding="async">
       </a>
       <span class="post-user">${esc(p.user)}</span>
     </header>
     <div class="slider-wrap">
-      <div class="slider">
-        ${p.slides.map((f, i) => slideHTML(f, pi || i, verlaufVon(p.slides[0].img))).join('')}
+      <div class="slider" tabindex="0" aria-label="Bilder des Beitrags, mit den Pfeiltasten blättern">
+        ${p.slides.map((f, i) => slideHTML(f, i > 0, verlaufVon((p.basis || p).slides[0].img), p.kategorie, true)).join('')}
       </div>
+      <button class="pfeil pfeil-l" type="button" aria-label="Vorheriges Bild" hidden>${PFEIL_L}</button>
+      <button class="pfeil pfeil-r" type="button" aria-label="Nächstes Bild"${p.slides.length > 1 ? '' : ' hidden'}>${PFEIL_R}</button>
     </div>
     <div class="dots" aria-hidden="true">
       ${p.slides.map((_, i) => `<span class="dot${i ? '' : ' active'}"></span>`).join('')}
@@ -769,10 +1178,11 @@ document.getElementById('feed').innerHTML = POSTS.map((p, pi) => `
           <img src="${esc(a.icon)}" alt="">
           ${(a.action === 'share' ? p.shared : a.count) != null ? `<span class="act-count">${esc(a.action === 'share' ? p.shared : a.count)}</span>` : ''}
         </button>`).join('')}
+      <button class="act such" type="button" aria-label="Forderungen durchsuchen" aria-haspopup="dialog" data-action="suche"><img src="1211.svg" alt=""></button>
       <button class="act save" type="button" aria-label="${esc(p.save.label)}"><img src="${esc(p.save.icon)}" alt=""></button>
       <button class="act" type="button" aria-label="${esc(p.more.label)}" aria-haspopup="dialog" data-action="ki"><img src="${esc(p.more.icon)}" alt=""></button>
     </div>
-  </article>`).join('');
+  </article>`;
 
 /* =====================  Kurzer Hinweis (Toast)  ===================== */
 const toastEl = document.createElement('div');
@@ -790,18 +1200,37 @@ const toast = msg => {
 /* =====================  Export  =====================
    Öffnet sich über das Symbol 1201.svg (data-action="share"). Exportiert wird die Forderung, die im angetippten Beitrag gerade sichtbar ist.
    Drei Arten (Tabelle EXPORT_ARTEN):
-     beitrag – ganzer Beitrag als Bilddatei.  TEST: derzeit das Beitragsbild selbst (z. B. 035.jpg); später das fertig gesetzte Bild mit Text.
-     bild    – nur das Bild als Bilddatei.    TEST: derzeit ebenfalls das Beitragsbild (z. B. 035.jpg); wird später noch verändert.
-     text    – nur der Text (Forderung und Erklärung), ohne die **-Markierungen.
-   Bilder gehen über das systemeigene Teilen-Menü (Web Share API mit Datei; braucht https und einen Tipp), sonst als Download.
-   Text geht über das Teilen-Menü, sonst in die Zwischenablage.
+     beitrag – das fertig gesetzte Bild (Foto, Verlauf, Text, Logos) aus EXPORT_BILDER, erzeugt von export_thesen.py.
+               Mehrfach verwendete Forderungen: die a/b-Fassung mit dem Logo der Gruppe dieses Beitrags (exportName).
+               Es wird zuerst .jpg, dann .png gesucht; fehlt die Datei, kommt ein Hinweis statt eines falschen Bildes.
+     bild    – nur das Hintergrundbild, als PNG-Fassung aus EXPORT_BILDER (0001.png …; im Feed wird die JPG-Fassung aus Hintergrundbilder/ gezeigt).
+               Fehlt die PNG-Datei, kommt ein Hinweis.
+     text    – nur der Text (Forderung und Erklärung).
+   Bilder gehen auf Handy/Tablet über das systemeigene Teilen-Menü (Web Share API mit Datei; braucht https und einen Tipp), am PC und als Rückfall als Download.
+   Text kommt direkt in die Zwischenablage: als formatierter Text (Forderung und **-Markierungen fett), wo das Ziel ihn annimmt,
+   und zusätzlich als reiner Text ohne Markierungen für Ziele ohne Formatierung.
    Die Bilddatei wird schon beim Auswählen geladen, damit das Teilen-Menü beim Tipp auf „Exportieren“ sofort aufgeht (iOS verlangt das). */
 const dateiName = u => String(u).split('?')[0].split('/').pop();
 const klartext = s => String(s).replace(/\*\*(.+?)\*\*/g, '$1').replace(/\s+/g, ' ').trim();   // ohne **-Markierung und ohne Zeilenumbrüche
+const fetttext = s => esc(String(s).replace(/\s+/g, ' ').trim()).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');   // HTML: **Wort** wird fett
+// Wo die großen Dateien liegen (Export-Bilder, Wahlprogramm für den KI-Prompt): vorerst bei Cloudflare Pages,
+// weil sie fürs GitHub-Repo zu groß sind. Läuft alles auf dem eigenen Server, hier '' eintragen (= dieselbe Adresse wie die Seite).
+// Die Seite darf auch auf einer anderen Adresse laufen: Cloudflare Pages erlaubt den Abruf der Bilder per CORS (_headers aus veroeffentlichen.py).
+const DATEI_HOST = 'https://main.linksinsta.pages.dev/';
+// Ordner und Endungen der fertig gesetzten Bilder (export_thesen.py, Standard-Zielordner export-bilder/); erste vorhandene Datei gewinnt
+const EXPORT_BILDER = { ordner: DATEI_HOST + 'export-bilder/', endungen: ['jpg', 'png'] };
+const hintergrundPng = f => EXPORT_BILDER.ordner + String(f.img).replace(/\.[^.]+$/, '') + '.png';   // 0001.jpg → export-bilder/0001.png
+const beitragsBilder = (f, gruppe) => EXPORT_BILDER.endungen.map(e => `${EXPORT_BILDER.ordner}${exportName(f.nr, gruppe)}.${e}`);
+// gesperrt: true – Art ist sichtbar, aber nicht wählbar (Hinweis in Rot), z. B. solange die Bilddateien nicht online liegen.
+const EXPORT_GESPERRT_HINWEIS = 'Dateien stehen noch nicht zur Verfügung';
 const EXPORT_ARTEN = [
-  { id: 'beitrag', name: 'Ganzer Beitrag', info: f => 'Bilddatei: ' + dateiName(f.img), bild: f => f.img },
-  { id: 'bild',    name: 'Nur das Bild',   info: f => 'Bilddatei: ' + dateiName(f.img), bild: f => f.img },
-  { id: 'text',    name: 'Nur der Text',   info: () => 'Forderung und Erklärung',        text: f => klartext(f.head) + '\n\n' + klartext(f.text) },
+  { id: 'beitrag', name: 'Ganzer Beitrag', info: (f, g) => 'Bild mit Text: ' + exportName(f.nr, g), bild: (f, g) => beitragsBilder(f, g) },
+  { id: 'bild',    name: 'Nur das Bild',   info: f => 'Bilddatei: ' + dateiName(hintergrundPng(f)), bild: f => [hintergrundPng(f)] },
+  { id: 'text',    name: 'Nur der Text',   info: () => 'Forderung und Erklärung, wird kopiert',
+    text: f => ({
+      rein: klartext(f.head) + '\n\n' + klartext(f.text),
+      html: `<p><b>${esc(klartext(f.head))}</b></p><p>${fetttext(f.text)}</p>`,
+    }) },
 ];
 
 // Aktuell sichtbare Forderung (vollständiger Eintrag aus FORDERUNGEN) des Beitrags, in dem das Symbol angetippt wurde
@@ -817,6 +1246,8 @@ function exDatei(url) {
       try {
         const r = await fetch(url);
         if (!r.ok) throw r.status;
+        // Manche Hoster liefern für fehlende Dateien eine HTML-Seite mit Status 200 – das ist kein Bild
+        if (/^text\/html/i.test(r.headers.get('Content-Type') || '')) throw 404;
         const b = await r.blob(), name = dateiName(url);
         return new File([b], name, { type: b.type.startsWith('image/') ? b.type : /\.png$/i.test(name) ? 'image/png' : 'image/jpeg' });
       } catch {
@@ -828,10 +1259,27 @@ function exDatei(url) {
   return exCache.get(url);
 }
 
-// Rückgabe: true = erledigt, false = Teilen-Menü wurde geschlossen (Dialog bleibt offen)
-async function exportiereBild(url) {
-  const file = await exDatei(url);
-  if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+// Erste ladbare Datei aus einer Liste von Adressen: { url, file } oder null
+async function exErste(urls) {
+  for (const url of urls) {
+    const file = await exDatei(url);
+    if (file) return { url, file };
+  }
+  return null;
+}
+
+// Rückgabe: true = erledigt, false = Teilen-Menü wurde geschlossen bzw. Datei fehlt (Dialog bleibt offen)
+async function exportiereBild(urls) {
+  const gefunden = await exErste(urls);
+  if (!gefunden && location.protocol !== 'file:') {   // per file:// lässt sich nichts vorab laden, dort greift unten der direkte Download
+    toast('Bilddatei noch nicht vorhanden: ' + dateiName(urls[0]).replace(/\.[^.]+$/, ''));
+    return false;
+  }
+  const url = gefunden ? gefunden.url : urls[0], file = gefunden && gefunden.file;
+  // Teilen-Menü nur auf Handy/Tablet (Touch ohne Maus). Am PC bietet das System-Menü (z. B. Windows „Freigeben“)
+  // keinen Download an – dort wird die Datei direkt heruntergeladen.
+  const mobil = matchMedia('(hover: none) and (pointer: coarse)').matches;
+  if (mobil && file && navigator.canShare && navigator.canShare({ files: [file] })) {
     try { await navigator.share({ files: [file] }); return true; }
     catch (e) {
       if (e.name === 'AbortError') return false;
@@ -848,17 +1296,49 @@ async function exportiereBild(url) {
   toast('Download gestartet: ' + dateiName(url));
   return true;
 }
-async function exportiereText(text) {
-  if (navigator.share) {
-    try { await navigator.share({ text }); return true; }
-    catch (e) {
-      if (e.name === 'AbortError') return false;
-      console.warn('Teilen fehlgeschlagen, Text wird kopiert:', e);
-    }
+// Kopiert den Text in die Zwischenablage. Reihenfolge der Wege (der erste, der klappt, gewinnt):
+//   1. Clipboard API mit HTML und reinem Text (moderne Browser; Hervorhebungen fett)
+//   2. Kopieren einer unsichtbaren formatierten Textauswahl (ältere Browser; ebenfalls fett)
+//   3. nur reiner Text, 4. Eingabefenster zum manuellen Kopieren
+// Muss direkt aus dem Tipp auf „Exportieren“ heraus laufen, sonst verweigern Browser den Zugriff.
+async function exportiereText({ rein, html }) {
+  const geschafft = () => { toast('Text kopiert'); return true; };
+  if (navigator.clipboard && window.ClipboardItem) {
+    try {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([rein], { type: 'text/plain' }),
+      })]);
+      return geschafft();
+    } catch (e) { console.warn('Formatiertes Kopieren nicht möglich:', e); }
   }
-  try { await navigator.clipboard.writeText(text); toast('Text kopiert'); }
-  catch { window.prompt('Text zum Kopieren:', text); }
+  if (kopiereAuswahl(html, rein)) return geschafft();
+  try { await navigator.clipboard.writeText(rein); return geschafft(); }
+  catch { window.prompt('Text zum Kopieren:', rein); }
   return true;
+}
+function kopiereAuswahl(html, rein) {
+  const el = document.createElement('div');
+  el.contentEditable = 'true';
+  el.style.cssText = 'position:fixed;left:-9999px;top:0;white-space:pre-wrap';
+  el.innerHTML = html;
+  document.body.appendChild(el);
+  const sel = getSelection(), alt = sel.rangeCount ? sel.getRangeAt(0) : null;
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  sel.removeAllRanges(); sel.addRange(range);
+  const beimKopieren = e => {   // reinen Text sauber mitgeben (ohne doppelte Leerzeilen aus den Absätzen)
+    e.clipboardData.setData('text/html', html);
+    e.clipboardData.setData('text/plain', rein);
+    e.preventDefault();
+  };
+  document.addEventListener('copy', beimKopieren, { once: true });
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch { ok = false; }
+  document.removeEventListener('copy', beimKopieren);
+  sel.removeAllRanges(); if (alt) sel.addRange(alt);
+  el.remove();
+  return ok;
 }
 
 const exEl = document.createElement('div');
@@ -870,7 +1350,7 @@ exEl.innerHTML = `
     <p class="fb-ctx" hidden></p>
     <div class="ki-options" role="radiogroup" aria-label="Export-Art">
       ${EXPORT_ARTEN.map(a => `
-      <button class="ki-option" type="button" role="radio" aria-checked="false" data-id="${esc(a.id)}">
+      <button class="ki-option${a.gesperrt ? ' ex-gesperrt' : ''}" type="button" role="radio" aria-checked="false" data-id="${esc(a.id)}"${a.gesperrt ? ' disabled aria-disabled="true"' : ''}>
         <span class="ki-name">${esc(a.name)}<small></small></span>
         <span class="ki-radio" aria-hidden="true"></span>
       </button>`).join('')}
@@ -883,21 +1363,22 @@ document.body.appendChild(exEl);
 const exDialog = exEl.querySelector('.ki-dialog');
 const exCtxEl = exEl.querySelector('.fb-ctx');
 const exGoEl = exEl.querySelector('.ex-go');
-let exOpener = null, exFo = null, exArt = null, exBusy = false;
+let exOpener = null, exFo = null, exGruppe = null, exArt = null, exBusy = false;
 
 function exSelect(id) {
-  exArt = EXPORT_ARTEN.find(a => a.id === id) || null;
+  exArt = EXPORT_ARTEN.find(a => a.id === id && !a.gesperrt) || null;
   exEl.querySelectorAll('.ki-option').forEach(b => b.setAttribute('aria-checked', String(!!exArt && b.dataset.id === exArt.id)));
   if (exArt) exGoEl.removeAttribute('aria-disabled'); else exGoEl.setAttribute('aria-disabled', 'true');
-  if (exArt && exArt.bild) exDatei(exArt.bild(exFo));   // Datei schon jetzt laden
+  if (exArt && exArt.bild) exErste(exArt.bild(exFo, exGruppe));   // Datei schon jetzt laden
 }
 function exOpen(opener) {
   const f = forderungVon(opener);
   if (!f) return;
-  exOpener = opener; exFo = f; exBusy = false;
+  const g = Number(opener.closest('.post').dataset.gruppe);
+  exOpener = opener; exFo = f; exGruppe = Number.isInteger(g) ? g : null; exBusy = false;
   exCtxEl.textContent = 'Aktueller Beitrag:\n' + klartext(f.head);
   exCtxEl.hidden = false;
-  exEl.querySelectorAll('.ki-option small').forEach((el, i) => { el.textContent = EXPORT_ARTEN[i].info(f); });
+  exEl.querySelectorAll('.ki-option small').forEach((el, i) => { el.textContent = EXPORT_ARTEN[i].gesperrt ? EXPORT_GESPERRT_HINWEIS : EXPORT_ARTEN[i].info(f, exGruppe); });
   exSelect(null);   // bei jedem Öffnen ohne Vorauswahl
   exEl.classList.add('open');
   document.documentElement.style.overflow = 'hidden';   // Seite dahinter nicht scrollbar
@@ -914,7 +1395,7 @@ async function exGo() {
   if (!exArt || !exFo || exBusy) return;
   exBusy = true;
   try {
-    const fertig = exArt.text ? await exportiereText(exArt.text(exFo)) : await exportiereBild(exArt.bild(exFo));
+    const fertig = exArt.text ? await exportiereText(exArt.text(exFo)) : await exportiereBild(exArt.bild(exFo, exGruppe));
     if (fertig) exClose();
   } finally {
     exBusy = false;
@@ -941,7 +1422,7 @@ const HEARTS_API = 'https://herzen.DEIN-NAME.workers.dev';   // Worker unter eig
 
 const hearts = { counts: store.get(HK.counts, {}), mine: new Set(store.get(HK.mine, [])), busy: new Set() };
 
-document.querySelectorAll('.act.like').forEach(b => { new Image().src = b.dataset.iconOn; });   // Symbol vorladen, damit beim ersten Tipp nichts flackert
+new Image().src = POSTS[0].actions.find(a => a.iconOn).iconOn;   // Symbol vorladen, damit beim ersten Tipp nichts flackert
 
 // Zeigt Zustand und Zahl eines Herz-Buttons. animate = true nur direkt nach einem Tipp.
 function paintLike(btn, animate = false) {
@@ -1003,7 +1484,7 @@ async function toggleLike(btn) {
   } catch (err) {
     want ? hearts.mine.delete(id) : hearts.mine.add(id);        // zurückrollen
     hearts.counts[id] = before;
-    toast(err === 429 ? 'Gerade sehr viele Herzen – bitte kurz warten' : 'Herz gerade nicht möglich – bitte später erneut versuchen');
+    toast(err === 429 ? 'Gerade sehr viele Herzen – bitte kurz warten' : 'Das Liken der Beiträge ist noch in Arbeit...');
   } finally {
     hearts.busy.delete(id);
     store.set(HK.mine, [...hearts.mine]);
@@ -1026,12 +1507,23 @@ document.getElementById('feed').addEventListener('click', e => {
    Öffnet sich über das Symbol 1204.svg (data-action="ki"). Alles dahinter wird weichgezeichnet.
    Erst ein Klick auf den Button im Overlay leitet endgültig zum gewählten Anbieter weiter. */
 const KI_ANBIETER = [
-  { id: 'chatgpt', name: 'ChatGPT', firma: 'OpenAI',    url: 'https://chatgpt.com/', login: false },
-  { id: 'claude',  name: 'Claude',  firma: 'Anthropic', url: 'https://claude.ai/',   login: true  },   // login: true = Hinweis „Anmeldung erforderlich“
-  { id: 'grok',    name: 'Grok',    firma: 'xAI',       url: 'https://grok.com/',    login: false },
+  { id: 'chatgpt', name: 'ChatGPT', firma: 'OpenAI',    url: 'https://chatgpt.com/?q=',  login: false },
+  { id: 'claude',  name: 'Claude',  firma: 'Anthropic', url: 'https://claude.ai/new?q=', login: true  },   // login: true = Hinweis „Anmeldung erforderlich“
+  { id: 'grok',    name: 'Grok',    firma: 'xAI',       url: 'https://grok.com/?q=',     login: true  },
 ];
-// Ziel-Adresse je Anbieter. Aktuell nur die Startseite; hier wird später der Prompt übergeben.
-const kiUrl = anbieter => anbieter.url;
+// Wahlprogramm-Dateien (erzeugt von build_wahlprogramm.py, liegen unter DATEI_HOST); Themendatei je Beitrag aus wahlprogramm-dateien.js.
+// Immer als vollständige Adresse, denn die KI ruft sie selbst ab.
+const KI_BASIS = new URL('Wahlprogramm/', DATEI_HOST || location.href).href;
+// Prompt mit Themendatei des Beitrags und Überschrift der Forderung, die beim Öffnen des KI-Fensters sichtbar war
+const kiPrompt = ({ datei, head }) =>
+  (datei ? `Lies zunächst ${KI_BASIS}${datei} und verschaffe dir einen kurzen Überblick über ${KI_BASIS}Wahlprogramm.md. Du musst mir beides nicht zusammenfassen. `
+         : `Verschaffe dir zunächst einen kurzen Überblick über ${KI_BASIS}Wahlprogramm.md. Du musst es mir nicht zusammenfassen. `) +
+  'Ich möchte mich mit dir über das Wahlprogramm der Linken austauschen' +
+  (head ? `, und zwar zuerst über die Forderung "${head}".` : '.') +
+  ' Lass uns dabei locker und freundschaftlich schreiben wie in einem Chat: Antworte mir bitte in zwei, drei Sätzen und frag mich dann etwas zu meiner persönlichen Situation.';
+// Ziel-Adresse je Anbieter: Prompt steht direkt im Chatfenster
+let kiCtx = {};
+const kiUrl = anbieter => anbieter.url + encodeURIComponent(kiPrompt(kiCtx));
 
 const appEl = document.getElementById('app');
 const kiEl = document.createElement('div');
@@ -1062,6 +1554,7 @@ function kiSelect(id) {
   const a = KI_ANBIETER.find(x => x.id === id) || null;
   kiEl.querySelectorAll('.ki-option').forEach(b => b.setAttribute('aria-checked', String(!!a && b.dataset.id === a.id)));
   kiHint.hidden = !(a && a.login);
+  if (a && a.login) kiHint.textContent = 'Hinweis: Für ' + a.name + ' ist eine Anmeldung erforderlich. Du benötigst dafür ein Konto bei ' + a.firma + '.';
   if (a) {
     kiGo.href = kiUrl(a);
     kiGo.textContent = 'Weiter zu ' + a.name;
@@ -1074,6 +1567,10 @@ function kiSelect(id) {
 }
 function kiOpen(opener) {
   kiOpener = opener;
+  try {
+    const post = opener.closest('.post').querySelector('[data-post]');
+    kiCtx = { head: currentForderung(opener).head, datei: (post && KI_DATEI[post.dataset.post]) || '' };
+  } catch { kiCtx = {}; }
   kiSelect(null);   // bei jedem Öffnen ohne Vorauswahl
   kiEl.classList.add('open');
   document.documentElement.style.overflow = 'hidden';   // Seite dahinter nicht scrollbar
@@ -1200,31 +1697,48 @@ fbForm.addEventListener('submit', async e => {
 });
 
 /* =====================  Schriftgröße der Forderung einpassen  =====================
-   Forderung: zweizeilig, so groß wie möglich (bis HEAD_MAX) – die breitere der beiden Zeilen füllt die Textbreite.
+   Forderung: zweizeilig, so groß wie möglich (bis HEAD_MAX) – die breitere der Zeilen füllt die Textbreite.
+   Würde sie zweizeilig kleiner als HEAD_MIN, wird sie dreizeilig gesetzt (bis HEAD_MAX_3), sofern das größer ausfällt.
    Erklärung: feste Schriftgröße (--body-size im CSS), Umbruch automatisch durch den Browser. */
-function fitText() {
-  document.querySelectorAll('.slide').forEach(s => {
-    const W = s.clientWidth; if (!W) return;
+function fitText(scope = document) {
+  // Erst alle Breiten lesen, dann alle Größen setzen und danach einmal messen.
+  // So erzwingt der Browser einen Layout-Durchlauf statt einen je Bild.
+  // scope: ein Element (z. B. document) oder eine Liste von Beiträgen (beim Aufbau in Etappen nur die neuen).
+  const slides = Array.isArray(scope) ? scope.flatMap(el => [...el.querySelectorAll('.slide')]) : [...scope.querySelectorAll('.slide')];
+  const aktiv = slides
+    .map(s => { const head = s.querySelector('.head'); return { W: s.clientWidth, head, v2: head.querySelector('.v2'), v3: head.querySelector('.v3') }; })
+    .filter(x => x.W);
+  aktiv.forEach(x => { x.head.style.fontSize = '100px'; x.head.classList.remove('head-3'); x.v3.style.display = 'block'; });   // Messung bei bekannter Größe, beide Fassungen sichtbar
+  aktiv.forEach(x => { x.b2 = x.v2.offsetWidth; x.b3 = x.v3.offsetWidth; });
+  aktiv.forEach(({ W, head, v3, b2, b3 }) => {
     const avail = W * (100 - 2 * PAD) / 100, cqw = W / 100;
-    const head = s.querySelector('.head');
-    head.style.fontSize = '100px';   // Messung bei bekannter Größe
-    head.style.fontSize = Math.min(HEAD_MAX, 100 * avail / head.offsetWidth / cqw) + 'cqw';
+    const s2 = Math.min(HEAD_MAX, 100 * avail / b2 / cqw), s3 = Math.min(HEAD_MAX_3, 100 * avail / b3 / cqw);
+    const drei = s2 < HEAD_MIN && s3 > s2;
+    v3.style.display = '';
+    head.classList.toggle('head-3', drei);
+    head.style.fontSize = (drei ? s3 : s2) + 'cqw';
   });
 }
-fitText();
 if (document.fonts) {   // nach dem Laden der Schriften neu einpassen (Textbreiten hängen von der Schrift ab)
-  Promise.all(['900 1em "Work Sans"'].map(f => document.fonts.load(f))).then(fitText, fitText);
-  document.fonts.ready.then(fitText);
+  Promise.all(['900 1em "Work Sans"'].map(f => document.fonts.load(f))).then(() => fitText(), () => fitText());
+  document.fonts.ready.then(() => fitText());
 }
 
 /* =====================  Wischbare Bildbereiche: sofortiger Bildwechsel + Punkte  ===================== */
 
 // Jede seitliche Wischbewegung (Touch, Stift, seitliches Scrollen am Trackpad / mit Shift + Mausrad) schaltet sofort
 // genau ein Bild weiter bzw. zurück – ohne Mitziehen und ohne Gleiten, nur mit kurzer Überblendung (--blende-dauer im CSS).
-// Vertikales Wischen bleibt unberührt.
-const SWIPE_SCHWELLE = 16;   // px seitlicher Weg, ab dem die Bewegung als Wischen zählt (kleiner = reagiert früher)
+// Vertikales Wischen bleibt unberührt. Die Bildleiste ist per CSS nicht nativ scrollbar (overflow-x: hidden):
+// Es gibt nur zwei Ergebnisse – nichts passiert, oder das nächste bzw. vorherige Bild steht vollständig da.
+const SWIPE_SCHWELLE = 24;    // px seitlicher Weg, ab dem eine deutlich waagerechte Bewegung schon während des Wischens umschaltet
+const SWIPE_STEIL = 1.5;      // so viel waagerechter als senkrecht muss die Bewegung dafür sein
+const SWIPE_ENDE = 36;        // px seitlicher Weg, der beim Loslassen noch zählt, auch wenn die Seite dabei etwas senkrecht gescrollt hat
+const SWIPE_ENDE_STEIL = 1.2; // Verhältnis waagerecht : senkrecht beim Loslassen
+const RAD_SCHWELLE = 20;      // px summiertes seitliches Scrollen (Trackpad / Shift + Mausrad), ab dem eine Geste umschaltet
+const RAD_PAUSE = 160;        // ms ohne Scroll-Ereignis: danach beginnt eine neue Geste
 
-document.querySelectorAll('.post').forEach(post => {
+// Richtet einen Beitrag ein (Wischen, Punkte). Wird für jeden Beitrag aufgerufen, sobald er im Feed erscheint.
+const einrichtenBeitrag = post => {
   const slider = post.querySelector('.slider');
   const slides = [...slider.querySelectorAll('.slide')];
   const dots = [...post.querySelectorAll('.dot')];
@@ -1256,32 +1770,69 @@ document.querySelectorAll('.post').forEach(post => {
     slider.scrollTo({ left: ziel * w, behavior: 'instant' });
   };
 
-  // Touch / Stift
-  let start = null;   // laufende Berührung, solange für sie noch kein Bildwechsel ausgelöst wurde
+  // Touch: über Touch-Ereignisse statt Pointer-Ereignisse. Übernimmt der Browser eine leicht schräge Geste als senkrechtes
+  // Scrollen, bricht er Pointer-Ereignisse ab (pointercancel) – Touch-Ereignisse laufen dagegen bis zum Loslassen weiter.
+  // Deutlich waagerecht: Wechsel schon während der Bewegung. Sonst entscheidet beim Loslassen der Gesamtweg.
+  let beruehrung = null;   // { x, y, fertig } der laufenden Ein-Finger-Berührung
+  const wischWeg = t => ({ dx: t.clientX - beruehrung.x, dy: t.clientY - beruehrung.y });
+  slider.addEventListener('touchstart', e => {
+    beruehrung = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY, fertig: false } : null;   // zwei Finger (Zoomen): kein Wischen
+  }, { passive: true });
+  slider.addEventListener('touchmove', e => {
+    if (!beruehrung || beruehrung.fertig) return;
+    if (e.touches.length !== 1) { beruehrung = null; return; }
+    const { dx, dy } = wischWeg(e.touches[0]);
+    if (Math.abs(dx) < SWIPE_SCHWELLE || Math.abs(dx) < SWIPE_STEIL * Math.abs(dy)) return;
+    beruehrung.fertig = true;              // pro Berührung genau ein Bildwechsel
+    gehe(dx < 0 ? 1 : -1);
+  }, { passive: true });
+  slider.addEventListener('touchend', e => {
+    if (beruehrung && !beruehrung.fertig && e.touches.length === 0 && e.changedTouches.length) {
+      const { dx, dy } = wischWeg(e.changedTouches[0]);
+      if (Math.abs(dx) >= SWIPE_ENDE && Math.abs(dx) >= SWIPE_ENDE_STEIL * Math.abs(dy)) gehe(dx < 0 ? 1 : -1);
+    }
+    if (e.touches.length === 0) beruehrung = null;
+  }, { passive: true });
+  slider.addEventListener('touchcancel', () => { beruehrung = null; }, { passive: true });
+
+  // Stift (ohne Touch-Ereignisse): Wechsel, sobald die Bewegung deutlich waagerecht ist
+  let stift = null;
   slider.addEventListener('pointerdown', e => {
-    start = e.pointerType === 'mouse' ? null : { id: e.pointerId, x: e.clientX, y: e.clientY };
+    stift = e.pointerType === 'pen' ? { id: e.pointerId, x: e.clientX, y: e.clientY } : null;
   });
   slider.addEventListener('pointermove', e => {
-    if (!start || e.pointerId !== start.id) return;
-    const dx = e.clientX - start.x, dy = e.clientY - start.y;
-    if (Math.abs(dx) < SWIPE_SCHWELLE || Math.abs(dx) < Math.abs(dy)) return;
-    start = null;                          // pro Wischbewegung genau ein Bildwechsel
+    if (!stift || e.pointerId !== stift.id) return;
+    const dx = e.clientX - stift.x, dy = e.clientY - stift.y;
+    if (Math.abs(dx) < SWIPE_SCHWELLE || Math.abs(dx) < SWIPE_STEIL * Math.abs(dy)) return;
+    stift = null;
     gehe(dx < 0 ? 1 : -1);
   });
-  slider.addEventListener('pointerup', () => { start = null; });
-  slider.addEventListener('pointercancel', () => { start = null; });
+  slider.addEventListener('pointerup', () => { stift = null; });
+  slider.addEventListener('pointercancel', () => { stift = null; });
 
-  // Trackpad / Mausrad (seitlich): ein Bildwechsel je Geste, das Nachlaufen der Trägheit löst keinen zweiten aus
-  let radLetzt = 0;
+  // Trackpad / Mausrad (seitlich): ein Bildwechsel je Geste. Eine Geste endet nach RAD_PAUSE ohne Ereignis.
+  // Das Nachlaufen der Trägheit wird stetig schwächer – springt das seitliche Scrollen dagegen deutlich an
+  // oder wechselt kräftig die Richtung, ist das ein neuer Wischer und schaltet erneut (statt verloren zu gehen).
+  let rad = null;   // { x, y, fertig, letzt, betrag, spitze, abklingend, richtung } der laufenden Geste
   slider.addEventListener('wheel', e => {
-    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;   // vertikales Scrollen der Seite bleibt unberührt
-    e.preventDefault();
-    const jetzt = performance.now();
-    if (jetzt - radLetzt > 160) {
-      if (Math.abs(e.deltaX) < 2) return;
-      gehe(e.deltaX > 0 ? 1 : -1);
+    const faktor = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? slider.clientWidth : 1;   // Zeilen / Seiten in px umrechnen
+    const ex = e.deltaX * faktor, ey = e.deltaY * faktor;
+    const jetzt = performance.now(), betrag = Math.abs(ex), richtung = Math.sign(ex);
+    const neu = !rad || jetzt - rad.letzt > RAD_PAUSE
+      || (rad.fertig && rad.abklingend && betrag > 15 && betrag > 2.5 * rad.betrag)   // neuer Schwung, nachdem der alte schon abklang
+      || (rad.fertig && betrag > 15 && richtung && rad.richtung && richtung !== rad.richtung);   // kräftiger Richtungswechsel
+    if (neu) rad = { x: 0, y: 0, fertig: false, letzt: jetzt, betrag: 0, spitze: 0, abklingend: false, richtung: 0 };
+    rad.x += ex; rad.y += ey; rad.letzt = jetzt;
+    if (betrag) {
+      rad.betrag = betrag; rad.richtung = richtung;
+      rad.spitze = Math.max(rad.spitze, betrag);
+      if (betrag < 0.6 * rad.spitze) rad.abklingend = true;   // Schwung hat seinen Höhepunkt überschritten
     }
-    radLetzt = jetzt;
+    if (Math.abs(rad.x) <= Math.abs(rad.y)) return;   // überwiegend senkrecht: Seite scrollt normal weiter
+    e.preventDefault();                                // waagerecht: kein Zurück-Wischen des Browsers, keine Seitenverschiebung
+    if (rad.fertig || Math.abs(rad.x) < RAD_SCHWELLE) return;
+    rad.fertig = true;
+    gehe(rad.x > 0 ? 1 : -1);
   }, { passive: false });
 
   const io = new IntersectionObserver(entries => {
@@ -1295,8 +1846,812 @@ document.querySelectorAll('.post').forEach(post => {
   }, { root: slider, threshold: 0.6 });
 
   slides.forEach(s => io.observe(s));
+
+  // Maus: Pfeil-Buttons links und rechts am Bild; am ersten bzw. letzten Bild verschwindet der jeweilige Pfeil
+  const pfeilL = wrap.querySelector('.pfeil-l'), pfeilR = wrap.querySelector('.pfeil-r');
+  const pfeileZeigen = () => {
+    const w = slider.clientWidth;
+    if (!w) return;
+    const idx = Math.round(slider.scrollLeft / w);
+    pfeilL.hidden = idx <= 0;
+    pfeilR.hidden = idx >= slides.length - 1;
+  };
+  pfeilL.addEventListener('click', () => gehe(-1));
+  pfeilR.addEventListener('click', () => gehe(1));
+  slider.addEventListener('scroll', pfeileZeigen, { passive: true });
+
+  // Tastatur: Bildbereich per Tab erreichbar, Pfeiltasten blättern
+  slider.addEventListener('keydown', e => {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.key === 'ArrowRight') { e.preventDefault(); gehe(1); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); gehe(-1); }
+  });
+};
+
+/* =====================  Aufbau in Etappen  =====================
+   Die Platzhalter aus dem HTML sind schon sichtbar. Zuerst erscheinen die ersten Beiträge,
+   danach folgen die übrigen in kleinen Schritten, wenn der Browser gerade Zeit hat.
+   So muss nicht der ganze Feed fertig gebaut sein, bevor etwas zu sehen ist. */
+const FEED = document.getElementById('feed');
+
+/* =====================  Bilder nur in der Nähe laden (Arbeitsspeicher)  =====================
+   iOS Safari beendet den Tab, wenn zu viele große Bilder gleichzeitig im Speicher liegen (jedes Beitragsbild belegt
+   dekodiert rund 5,6 MB). Deshalb tragen nur die gerade sichtbaren Beiträge und einige davor und danach (BILD_VORAUS, BILD_ZURUECK)
+   ihre Bilder (src). Alle übrigen haben die Adresse nur in data-src; verlässt ein Beitrag das Fenster, wird sein src
+   wieder entfernt und der Browser gibt das Bild frei (zu sehen ist dann die Platzhalterfarbe, wie beim ersten Laden).
+   Innerhalb des Fensters lädt das erste Bild jedes Beitrags sofort, die weiteren (seitlich) wegen loading="lazy" erst beim Blättern.
+   Neue oder entfernte Beiträge (Aufbau in Etappen, Filter, Suche) erfasst ein MutationObserver von selbst. */
+// In Scrollrichtung werden mehr Beiträge vorgeladen als dahinter behalten (4 voraus, 1 zurück), damit beim
+// schnellen Scrollen das Bild schon fertig ist, wenn der Beitrag ins Bild kommt.
+const BILD_VORAUS = 4, BILD_ZURUECK = 1;
+const bildSichtbar = new Set();   // Beiträge, die gerade (teilweise) im Bildschirm liegen
+const bildGeladen = new Set();    // Beiträge, deren Bilder gerade ein src haben
+const bilderSetzen = (post, an) => {
+  // nur die Bilder im Slider selbst; die kurzlebige Kopie der Überblendung (.blende) bleibt unberührt
+  post.querySelectorAll('.slider .slide img[data-src]').forEach(img => {
+    if (an) { if (img.getAttribute('src') !== img.dataset.src) img.setAttribute('src', img.dataset.src); }
+    else if (img.hasAttribute('src')) { img.removeAttribute('src'); img.parentElement.classList.add('wartet'); }
+  });
+  an ? bildGeladen.add(post) : bildGeladen.delete(post);
+};
+// Bild geladen und dekodiert: erst jetzt Schrift und Verlauf zeigen (.wartet, siehe CSS) – alles erscheint auf einmal
+const bildFertig = e => {
+  const img = e.target, slide = img.parentElement;
+  if (img.tagName !== 'IMG' || !slide || !slide.classList.contains('wartet')) return;
+  const zeigen = () => { if (img.getAttribute('src')) slide.classList.remove('wartet'); };
+  if (e.type === 'error' || !img.decode) return zeigen();
+  img.decode().then(zeigen, zeigen);
+  setTimeout(zeigen, 1000);   // Sicherheitsnetz: decode() kann in einem Hintergrund-Tab ausbleiben, der Text soll nie fehlen
+};
+FEED.addEventListener('load', bildFertig, true);    // load/error steigen nicht auf, daher in der Capture-Phase
+FEED.addEventListener('error', bildFertig, true);
+let bildErsterVorher = -1, bildRichtung = 1;        // 1 = nach unten, -1 = nach oben
+function bildFensterAktualisieren() {
+  const posts = [...FEED.children].filter(el => el.classList.contains('post'));
+  let erster = -1, letzter = -1;
+  posts.forEach((el, i) => { if (bildSichtbar.has(el)) { if (erster < 0) erster = i; letzter = i; } });
+  if (erster < 0) return;   // nichts sichtbar (z. B. kurz während eines Ansichtswechsels): Zustand beibehalten
+  if (bildErsterVorher >= 0 && erster !== bildErsterVorher) bildRichtung = erster > bildErsterVorher ? 1 : -1;
+  bildErsterVorher = erster;
+  const von = erster - (bildRichtung > 0 ? BILD_ZURUECK : BILD_VORAUS);
+  const bis = letzter + (bildRichtung > 0 ? BILD_VORAUS : BILD_ZURUECK);
+  posts.forEach((el, i) => {
+    const an = i >= von && i <= bis;
+    if (an !== bildGeladen.has(el)) bilderSetzen(el, an);
+  });
+}
+const bildBeobachter = new IntersectionObserver(entries => {
+  entries.forEach(e => e.isIntersecting ? bildSichtbar.add(e.target) : bildSichtbar.delete(e.target));
+  bildFensterAktualisieren();
+});
+new MutationObserver(mutationen => {
+  mutationen.forEach(m => {
+    m.addedNodes.forEach(n => { if (n.classList && n.classList.contains('post')) bildBeobachter.observe(n); });
+    m.removedNodes.forEach(n => {
+      if (!n.classList || !n.classList.contains('post')) return;
+      bildBeobachter.unobserve(n);
+      bildSichtbar.delete(n);
+      if (bildGeladen.has(n)) bilderSetzen(n, false);   // herausgenommener Beitrag: Bilder sofort freigeben
+    });
+  });
+  // Positionen haben sich verschoben: Fenster sofort (noch vor dem Zeichnen) neu bestimmen, damit z. B. ein beim
+  // Ansichtswechsel ersetzter Beitrag sein Bild ohne Aufblitzen der Platzhalterfarbe behält
+  bildFensterAktualisieren();
+}).observe(FEED, { childList: true });
+
+const ERSTE_ETAPPE = 2;   // so viele Beiträge erscheinen sofort
+const ETAPPE = 4;         // danach je so viele Beiträge pro Schritt
+
+const idle = f => window.requestIdleCallback ? requestIdleCallback(f, { timeout: 500 }) : setTimeout(f, 30);
+
+let ANSICHT = POSTS;   // Beiträge, die der Feed gerade zeigt (alle oder nach Kategorie gefiltert), in Feed-Reihenfolge
+let lauf = 0;          // zählt bei jedem Ansichtswechsel hoch und beendet so das Nachladen der vorherigen Ansicht
+
+function beitraegeZeigen(von, bis, ersetzen = false) {
+  const html = ANSICHT.slice(von, bis).map((p, i) => postHTML(p, von + i)).join('');
+  if (ersetzen) FEED.innerHTML = html;            // entfernt die Platzhalter
+  else FEED.insertAdjacentHTML('beforeend', html);
+  const neu = [...FEED.querySelectorAll('.post')].slice(von);
+  neu.forEach(einrichtenBeitrag);
+  fitText(neu);   // nur die neuen Beiträge einpassen (früher der ganze Feed bei jeder Etappe: am Ende ~1000 Folien je Schritt)
+  neu.forEach((el, i) => trefferZeigen(el, ANSICHT[von + i]));   // Suche: Treffer-Punkte markieren, passendes Bild vorn
+  paintHearts();   // Herz-Buttons der neuen Beiträge mit den bekannten Zahlen füllen
+}
+
+beitraegeZeigen(0, Math.min(ERSTE_ETAPPE, ANSICHT.length), true);
+document.getElementById('app').setAttribute('aria-busy', 'false');
+
+const weitere = (von, nr = lauf) => {
+  if (nr !== lauf || von >= ANSICHT.length) return;
+  // Während das Story-Karussell bewegt wird, warten: Safari hat kein requestIdleCallback, jede Etappe würde das Wischen kurz stocken lassen
+  if (performance.now() < storyBewegtBis) { setTimeout(() => weitere(von, nr), 200); return; }
+  const bis = Math.min(von + ETAPPE, ANSICHT.length);
+  beitraegeZeigen(von, bis);
+  idle(() => weitere(bis, nr));
+};
+idle(() => weitere(ERSTE_ETAPPE, 0));
+
+/* =====================  Filtern über die Logos  =====================
+   Kategorie-Logo (1205–1209.svg, oben links): Der Feed zeigt nur noch Beiträge dieser Kategorie (maßgeblich ist die erste Forderung eines Beitrags).
+   Ecklogo (1210.svg, oben rechts): Der Feed zeigt wieder alle Beiträge, in neu ausgeloster Reihenfolge wie beim Neuladen der Seite.
+   Die Ansicht bleibt dabei stehen: Der angetippte Beitrag bleibt unverändert (gleiches Bild, gleiche Herzen) an derselben Stelle
+   auf dem Bildschirm und in derselben Spalte, nur die Beiträge davor und danach werden ausgetauscht. */
+const kategorieVon = p => p.kategorie;
+const neuGemischt = liste => liste
+  .map(p => ({ p, wert: (RANK.cMin + Math.random() * (RANK.cMax - RANK.cMin)) * ((p.hearts || 0) + RANK.sharedWeight * p.shared) }))
+  .sort((a, b) => b.wert - a.wert)
+  .map(x => x.p);
+
+function ansichtWechseln(postEl, filter) {
+  const posts = [...FEED.querySelectorAll('.post')];
+  const index = posts.indexOf(postEl);
+  const gezeigt = ANSICHT[index];
+  if (!gezeigt) return;
+  const p = gezeigt.basis || gezeigt;   // Suchansicht: Beitrag mit allen Bildern statt nur der Treffer
+  const oben = postEl.getBoundingClientRect().top;   // Lage auf dem Bildschirm, die erhalten bleiben soll
+  if (gezeigt !== p) {   // Suche beenden; der angetippte Beitrag zeigt wieder alle Bilder, das gerade sichtbare bleibt stehen
+    const nrJetzt = currentForderung(postEl.querySelector('.slider')).nr;
+    const tpl = document.createElement('template');
+    tpl.innerHTML = postHTML(p, index).trim();
+    const el = tpl.content.firstElementChild;
+    postEl.replaceWith(el);
+    postEl = el;
+    einrichtenBeitrag(el);
+    trefferZeigen(el, { ...p, start: Math.max(0, p.slides.findIndex(f => String(f.nr) === nrJetzt)) });
+  }
+  if (SUCHE) sucheBeendet();
+  const spalten = getComputedStyle(FEED).display === 'grid'
+    ? getComputedStyle(FEED).gridTemplateColumns.split(' ').length : 1;
+
+  const rest = filter
+    ? POSTS.filter(q => q !== p && kategorieVon(q) === filter)
+    : neuGemischt(POSTS.filter(q => q !== p));
+  // Möglichst gleich viele Beiträge davor wie bisher, mindestens aber dieselbe Spalte
+  let davor = Math.min(index, rest.length);
+  while (davor > 0 && davor % spalten !== index % spalten) davor--;
+
+  lauf++;
+  ANSICHT = [...rest.slice(0, davor), p, ...rest.slice(davor)];
+  posts.forEach(el => { if (el !== postEl) el.remove(); });
+  postEl.insertAdjacentHTML('beforebegin', ANSICHT.slice(0, davor).map((q, i) => postHTML(q, i + 1)).join(''));
+  [...FEED.querySelectorAll('.post')].slice(0, davor).forEach(einrichtenBeitrag);
+  fitText(FEED);
+  paintHearts();
+  window.scrollBy({ top: postEl.getBoundingClientRect().top - oben, behavior: 'instant' });
+  const nr = lauf;   // beim Planen festhalten: ein schneller zweiter Wechsel beendet dieses Nachladen
+  idle(() => weitere(davor + 1, nr));
+}
+
+FEED.addEventListener('click', e => {
+  const logo = e.target.closest('.kat');
+  if (logo) ansichtWechseln(logo.closest('.post'), logo.dataset.filter);
+});
+FEED.addEventListener('keydown', e => {
+  const logo = e.target.closest('.kat');
+  if (!logo || (e.key !== 'Enter' && e.key !== ' ')) return;
+  e.preventDefault();
+  ansichtWechseln(logo.closest('.post'), logo.dataset.filter);
 });
 
+/* =====================  Suche  =====================
+   Öffnet sich über das Symbol 1211.svg (data-action="suche", direkt links neben 1203.svg), über die Taste „/“ oder Strg/⌘ + K.
+   Durchsucht alle Forderungen aus forderungen.js (Forderung = „head“, Erklärung = „text“), live bei jeder Eingabe.
+   Abfragesprache (steht auch als Suchhilfe im Fenster):
+     miete wohnung        alle Begriffe müssen vorkommen (UND)
+     bus | bahn           einer der Begriffe genügt (auch: bus oder bahn)
+     "16 Euro"            genaue Wortfolge (auch „…“)
+     -studierende         Forderungen mit diesem Begriff ausschließen
+     titel:  text:        nur in der Forderung bzw. nur in der Erklärung suchen; kategorie: sucht im Namen der Kategorie
+     #12  #10-20  #3,7    nach Forderungsnummer(n)
+   Groß-/Kleinschreibung, Umlaute (ä = ae = a), ß = ss, Gendersternchen, Bindestriche und Tausenderpunkte spielen keine Rolle.
+   Teilwörter werden gefunden („miete“ findet „Kaltmiete“); Optionen: nur Wortanfänge / nur ganze Wörter.
+   Findet ein Begriff gar nichts, wird mit Tippfehler-Toleranz gesucht (ähnliche Schreibweisen werden angezeigt).
+   SUCH_SYNONYME: gleichwertige Begriffe, die automatisch mitgesucht werden (nur bei genau diesem Suchwort).
+   Ergebnis: Trefferliste mit markierten Fundstellen und Anzahl je Kategorie. „Im Feed zeigen“ filtert den Feed auf die Beiträge
+   mit Treffern (wahlweise nur die passenden Bilder oder ganze Beiträge mit markierten Punkten); ein Tipp auf einen Treffer stellt
+   dessen Beitrag an den Anfang. Der Suchzustand steht in der Adresse (#suche=…), so lässt sich eine Suche als Link weitergeben. */
+const SUCH_SYNONYME = [
+  ['öpnv', 'nahverkehr'],
+  ['krankenhaus', 'klinik'],
+  ['auto', 'pkw'],
+  ['fahrrad', 'radverkehr'],
+  ['azubi', 'auszubildende'],
+  ['geflüchtete', 'flüchtling'],
+  ['kommune', 'gemeinde'],
+];
+const S_GEWICHT = { head: 4, text: 1, sektion: 1.5 };   // Gewicht einer Fundstelle je Feld (für die Sortierung nach Relevanz)
+const S_SEITE = 50;                                      // so viele Treffer zeigt die Liste auf einmal
+const S_FELD_ALIAS = {
+  titel: 'head', forderung: 'head', ueberschrift: 'head', 'überschrift': 'head', head: 'head',
+  text: 'text', erklaerung: 'text', 'erklärung': 'text', body: 'text',
+  kategorie: 'sektion', kat: 'sektion', sektion: 'sektion',
+  nr: 'nr', nummer: 'nr',
+};
+// Kategorien für die Auswahl-Chips: die fünf Leitforderungen, danach die Themen der „Weiteren Forderungen“ (Feld „thema“ = ###-Überschrift in Forderungen.md)
+const sKat = f => KATEGORIE_LOGO[f.sektion] ? f.sektion : (f.thema || 'Weitere');
+const S_LEIT_KATS = Object.keys(KATEGORIE_LOGO);
+const S_THEMEN_KATS = [...new Set(FORDERUNGEN.filter(f => !KATEGORIE_LOGO[f.sektion]).map(sKat))];
+const S_KATS = [...S_LEIT_KATS, ...S_THEMEN_KATS];
+
+/* Normalisierung für den Vergleich. Liefert den Vergleichstext t, zu jedem Zeichen von t die Stelle im Original (map, für die Markierung)
+   sowie Wortanfänge (ws) und Wortenden (we) als Positionen in t. Regeln: klein, Akzente/Umlaute ohne Punkte (ä → a), ß → ss,
+   danach ae/oe/ue → a/o/u (so ist „Ärzte“ = „Aerzte“ = „Arzte“); Gendersternchen und weiche Trennstriche verschwinden ohne Wortgrenze,
+   Bindestriche verschwinden mit Wortgrenze („E-Auto“ → „eauto“, „auto“ ist dort trotzdem ein Wortanfang), Punkte zwischen Ziffern
+   verschwinden („7.500“ = „7500“), alles andere wird zu einem einzelnen Leerzeichen. Suchbegriff und Text laufen durch dieselbe Funktion. */
+function sNorm(src) {
+  src = String(src);
+  const t = [], map = [], ws = new Set(), we = new Set();
+  let imWort = false, neuesWort = true;
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '*' || ch === '­') continue;
+    if (/[-‐‑]/.test(ch) && imWort) { we.add(t.length); neuesWort = true; continue; }
+    if (ch === '.' && /\d/.test(src[i - 1] || '') && /\d/.test(src[i + 1] || '')) continue;
+    if (/[\p{L}\p{N}]/u.test(ch)) {
+      const teile = ch === 'ß' || ch === 'ẞ' ? 'ss' : ch.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+      for (const c of teile) {
+        if (!imWort || neuesWort) { ws.add(t.length); neuesWort = false; }
+        else if (c === 'e' && /[aou]/.test(t[t.length - 1])) continue;   // ae/oe/ue → a/o/u
+        imWort = true;
+        t.push(c); map.push(i);
+      }
+    } else {
+      if (imWort) we.add(t.length);
+      imWort = false; neuesWort = true;
+      if (t.length && t[t.length - 1] !== ' ') { t.push(' '); map.push(i); }
+    }
+  }
+  if (imWort) we.add(t.length);
+  const text = t.join('');
+  // Wörter als [Anfang, Ende) – für die Tippfehler-Suche
+  const anf = [...ws].sort((a, b) => a - b), enden = [...we].sort((a, b) => a - b);
+  const woerter = anf.map(a => [a, enden.find(e => e > a)]).filter(([, e]) => e != null);
+  return { t: text, map, ws, we, woerter };
+}
+const sNormText = s => sNorm(s).t.trim();
+
+// Suchindex: einmal beim Start
+const S_DOCS = FORDERUNGEN.map(f => {
+  const plain = { head: klartext(f.head), text: klartext(f.text), sektion: [f.sektion, f.thema].filter(Boolean).join(' · ') };   // „kategorie:“ findet Leitforderung und Thema
+  return { f, plain, n: { head: sNorm(plain.head), text: sNorm(plain.text), sektion: sNorm(plain.sektion) }, kat: sKat(f) };
+});
+const S_IN_BEITRAEGEN = new Map();   // Forderungsnummer → Anzahl Beiträge, in denen sie vorkommt
+FEED_ORDER.flat().forEach(nr => S_IN_BEITRAEGEN.set(nr, (S_IN_BEITRAEGEN.get(nr) || 0) + 1));
+const S_SYN = new Map();
+SUCH_SYNONYME.forEach(gruppe => {
+  const g = gruppe.map(sNormText);
+  g.forEach(w => S_SYN.set(w, g.filter(x => x !== w)));
+});
+
+// Suchanfrage zerlegen → Klauseln (UND-verknüpft); jede Klausel hat Alternativen (ODER) und ist ggf. verneint
+function sParse(q) {
+  const toks = [];
+  let i = 0;
+  while (i < q.length) {
+    if (/\s/.test(q[i])) { i++; continue; }
+    if (q[i] === '|') { toks.push({ op: true }); i++; continue; }
+    let neg = false, feld = '';
+    if (q[i] === '-' && q[i + 1] && !/\s/.test(q[i + 1])) { neg = true; i++; }
+    const m = /^([a-zäöüß]+):(?=\S)/i.exec(q.slice(i));
+    if (m && S_FELD_ALIAS[m[1].toLowerCase()]) { feld = S_FELD_ALIAS[m[1].toLowerCase()]; i += m[0].length; }
+    let text = '', phrase = false;
+    if (/["„“”»«]/.test(q[i])) {
+      const rest = q.slice(i + 1), zu = rest.search(/["“”«»]/);
+      text = zu < 0 ? rest : rest.slice(0, zu);
+      i += 1 + text.length + (zu < 0 ? 0 : 1);
+      phrase = true;
+    } else {
+      text = /^[^\s|"„“”»«]*/.exec(q.slice(i))[0];
+      i += Math.max(1, text.length);
+    }
+    if (!phrase && !neg && !feld && /^(oder|or)$/i.test(text)) { toks.push({ op: true }); continue; }
+    toks.push({ neg, feld, text, phrase });
+  }
+  const klauseln = [];
+  let oder = false;
+  for (const tk of toks) {
+    if (tk.op) { oder = true; continue; }
+    let atom = null;
+    const nrText = tk.feld === 'nr' ? tk.text.replace(/^#/, '') : (/^#/.test(tk.text) ? tk.text.slice(1) : null);
+    if (nrText != null && /^\d+(-\d+)?(,\d+(-\d+)?)*$/.test(nrText)) {
+      const teile = nrText.split(',').map(x => x.split('-').map(Number));
+      atom = { roh: tk.text, nr: n => teile.some(([a, b = a]) => n >= Math.min(a, b) && n <= Math.max(a, b)) };
+    } else {
+      const t = sNormText(tk.text);
+      if (t) atom = { roh: tk.text, t, phrase: tk.phrase, feld: tk.feld === 'nr' ? '' : tk.feld };
+    }
+    oder = oder && !tk.neg;
+    if (!atom) { oder = false; continue; }
+    const letzte = klauseln[klauseln.length - 1];
+    if (oder && letzte && !letzte.neg) letzte.alts.push(atom);
+    else klauseln.push({ neg: tk.neg, alts: [atom] });
+    oder = false;
+  }
+  // Synonyme als zusätzliche Alternativen
+  klauseln.forEach(k => {
+    k.alts.slice().forEach(a => {
+      if (a.t && !a.phrase && S_SYN.has(a.t)) S_SYN.get(a.t).forEach(s => k.alts.push({ ...a, roh: s, t: s, syn: true }));
+    });
+  });
+  return klauseln;
+}
+
+// Alle Fundstellen des normalisierten Begriffs t im normalisierten Feld nf; q = Güte (3 ganzes Wort, 2 Wortanfang, 1 Wortteil)
+function sFinde(nf, t, modus) {
+  const out = [];
+  for (let pos = nf.t.indexOf(t); pos !== -1; pos = nf.t.indexOf(t, pos + 1)) {
+    const anfang = nf.ws.has(pos), ganz = anfang && nf.we.has(pos + t.length);
+    if (modus === 'anfang' && !anfang) continue;
+    if (modus === 'wort' && !ganz) continue;
+    out.push({ a: pos, b: pos + t.length, q: ganz ? 3 : anfang ? 2 : 1 });
+  }
+  return out;
+}
+// Kleinster Bearbeitungsabstand (mit Vertauschung zweier Nachbarzeichen) von p zu irgendeinem Teilstück von w, höchstens k?
+function sAehnlich(p, w, k) {
+  const m = p.length;
+  if (w.length < m - k) return false;
+  let vor2 = null, vor = Array.from({ length: m + 1 }, (_, i) => i);
+  for (let j = 1; j <= w.length; j++) {
+    const cur = [0];
+    for (let i = 1; i <= m; i++) {
+      let d = Math.min(vor[i] + 1, cur[i - 1] + 1, vor[i - 1] + (p[i - 1] === w[j - 1] ? 0 : 1));
+      if (vor2 && i > 1 && p[i - 1] === w[j - 2] && p[i - 2] === w[j - 1]) d = Math.min(d, vor2[i - 2] + 1);
+      cur.push(d);
+    }
+    if (cur[m] <= k) return true;
+    vor2 = vor; vor = cur;
+  }
+  return false;
+}
+function sFindeAehnlich(nf, t, k) {
+  const out = [];
+  for (const [a, b] of nf.woerter) if (sAehnlich(t, nf.t.slice(a, b), k)) out.push({ a, b, q: 1, aehnlich: true });
+  return out;
+}
+
+const sFelder = (atom, z) => atom.feld ? [atom.feld] : z.feld === 'alle' ? ['head', 'text'] : [z.feld];
+
+// Trifft ein Suchbaustein die Forderung? → { score, fund: { feld: [Fundstellen] } } oder null
+function sAtom(doc, atom, z) {
+  if (atom.nr) return atom.nr(doc.f.nr) ? { score: 20, fund: {} } : null;
+  let score = 0;
+  const fund = {};
+  for (const k of sFelder(atom, z)) {
+    const nf = doc.n[k];
+    const f = atom.k ? sFindeAehnlich(nf, atom.t, atom.k) : sFinde(nf, atom.t, z.modus);
+    if (!f.length) continue;
+    const beste = Math.max(...f.map(x => x.q));
+    score += S_GEWICHT[k] * (beste + 0.25 * Math.min(f.length - 1, 3)) * (atom.k ? 0.4 : 1) * (atom.syn ? 0.7 : 1)
+           + (k === 'head' && f[0].a === 0 ? 1 : 0);   // Forderung beginnt mit dem Begriff
+    fund[k] = f;
+  }
+  return score ? { score, fund } : null;
+}
+
+// Zustand der Suche (Eingabe und Optionen im Fenster)
+const sZ = { q: '', kats: new Set(), modus: 'teil', feld: 'alle', sort: 'relevanz', tipp: true, nur: true };
+
+// Führt die Suche aus: { liste: [{ doc, score, fund }], proKat: Map, hinweise: [], aktiv }
+function sSuchen(z = sZ) {
+  const klauseln = sParse(z.q);
+  const hinweise = [];
+  // Tippfehler-Toleranz: nur für Begriffe, die (ab 5 Zeichen) wörtlich nirgends vorkommen.
+  // Erst 1 abweichendes Zeichen; 2 nur bei langen Begriffen und nur, wenn 1 nichts findet (hält die Treffer eng).
+  for (const k of klauseln) {
+    if (k.neg) continue;
+    for (const a of k.alts) {
+      if (!a.t || a.phrase || a.syn || !z.tipp || a.t.length < 5 || a.t.includes(' ')) continue;
+      if (S_DOCS.some(d => sAtom(d, a, z))) continue;
+      a.k = 1;
+      if (a.t.length >= 8 && !S_DOCS.some(d => sAtom(d, a, z))) a.k = 2;
+    }
+  }
+  const positiv = klauseln.filter(k => !k.neg);
+  const aktiv = klauseln.length > 0 || z.kats.size > 0;
+  const liste = [], proKat = new Map(S_KATS.map(k => [k, 0]));
+  if (aktiv) {
+    for (const doc of S_DOCS) {
+      let score = 0, ok = true;
+      const fund = { head: [], text: [] };
+      for (const k of klauseln) {
+        let best = 0, hit = false;
+        for (const a of k.alts) {
+          const r = sAtom(doc, a, z);
+          if (!r) continue;
+          hit = true; best = Math.max(best, r.score);
+          if (!k.neg) { (r.fund.head || []).forEach(x => fund.head.push(x)); (r.fund.text || []).forEach(x => fund.text.push(x)); }
+        }
+        if (k.neg ? hit : !hit) { ok = false; break; }
+        score += best;
+      }
+      if (!ok) continue;
+      proKat.set(doc.kat, proKat.get(doc.kat) + 1);
+      if (z.kats.size && !z.kats.has(doc.kat)) continue;
+      liste.push({ doc, score, fund });
+    }
+    if (z.sort === 'nr' || !positiv.length) liste.sort((a, b) => a.doc.f.nr - b.doc.f.nr);
+    else liste.sort((a, b) => b.score - a.score || a.doc.f.nr - b.doc.f.nr);
+  }
+  // Hinweise: ähnliche Schreibweisen und mitgesuchte Synonyme
+  for (const k of positiv) for (const a of k.alts) {
+    if (a.k) {
+      const woerter = new Map();
+      liste.forEach(r => ['head', 'text'].forEach(f => (r.fund[f] || []).forEach(x => {
+        if (!x.aehnlich) return;
+        const nf = r.doc.n[f], w = r.doc.plain[f].slice(nf.map[x.a], nf.map[x.b - 1] + 1);
+        woerter.set(w.toLowerCase(), (woerter.get(w.toLowerCase()) || 0) + 1);
+      })));
+      const top = [...woerter].sort((x, y) => y[1] - x[1]).slice(0, 6).map(x => x[0]);
+      hinweise.push(top.length
+        ? `Keine genauen Treffer für „${a.roh}“ – ähnliche Schreibweisen: ${top.join(', ')}`
+        : `Keine Treffer für „${a.roh}“, auch keine ähnlichen Schreibweisen.`);
+    }
+  }
+  const syn = positiv.flatMap(k => k.alts.filter(a => a.syn).map(a => a.roh));
+  if (syn.length) hinweise.push('Auch gesucht: ' + [...new Set(syn)].join(', '));
+  return { liste, proKat, hinweise, aktiv };
+}
+
+// Text mit <mark> an den Fundstellen (Positionen in der Normalform → Positionen im Original)
+function sMarkiert(plain, nf, fund) {
+  if (!fund || !fund.length) return esc(plain);
+  const iv = fund.map(x => [nf.map[x.a], nf.map[x.b - 1] + 1]).sort((x, y) => x[0] - y[0]);
+  const zus = [];
+  iv.forEach(([a, b]) => { const l = zus[zus.length - 1]; if (l && a <= l[1]) l[1] = Math.max(l[1], b); else zus.push([a, b]); });
+  let out = '', pos = 0;
+  zus.forEach(([a, b]) => { out += esc(plain.slice(pos, a)) + '<mark>' + esc(plain.slice(a, b)) + '</mark>'; pos = b; });
+  return out + esc(plain.slice(pos));
+}
+
+// Beiträge für den Feed: alle mit mindestens einem Treffer, der beste Treffer zuerst.
+// nur = true: je Beitrag nur die Treffer-Bilder, jede Forderung nur einmal (im bestplatzierten Beitrag).
+function sBeitraege(liste, nur) {
+  const rang = new Map(liste.map((r, i) => [r.doc.f.nr, i]));
+  const kandidaten = [];
+  POSTS.forEach((p, pos) => {
+    const hits = p.slides.filter(f => rang.has(f.nr));
+    if (hits.length) kandidaten.push({ p, pos, hits, best: Math.min(...hits.map(f => rang.get(f.nr))) });
+  });
+  kandidaten.sort((a, b) => a.best - b.best || a.pos - b.pos);
+  const gesehen = new Set(), aus = [];
+  for (const k of kandidaten) {
+    const trefferNr = new Set(k.hits.map(f => f.nr));
+    if (nur) {
+      const slides = k.hits.filter(f => !gesehen.has(f.nr)).sort((a, b) => rang.get(a.nr) - rang.get(b.nr));
+      slides.forEach(f => gesehen.add(f.nr));
+      if (slides.length) aus.push({ ...k.p, basis: k.p, slides, trefferNr, start: 0 });
+    } else {
+      aus.push({ ...k.p, basis: k.p, trefferNr, start: k.p.slides.findIndex(f => rang.get(f.nr) === k.best) });
+    }
+  }
+  return aus;
+}
+
+// Nach dem Einfügen eines Beitrags: Treffer-Punkte markieren (ganze Beiträge) und zum passenden Bild springen
+function trefferZeigen(el, p) {
+  if (!p) return;
+  if (p.trefferNr && p.basis && p.slides === p.basis.slides) {
+    const dots = el.querySelectorAll('.dot');
+    p.slides.forEach((f, i) => { if (p.trefferNr.has(f.nr) && dots[i]) dots[i].classList.add('treffer'); });
+  }
+  if (p.start > 0) {
+    const slider = el.querySelector('.slider');
+    slider.scrollTo({ left: p.start * slider.clientWidth, behavior: 'instant' });
+  }
+}
+
+/* ---------- Leiste über dem Feed und Feed-Filter ---------- */
+let SUCHE = null;   // aktive Suche im Feed: { z (Kopie des Zustands), anzahl, beitraege } oder null
+const leisteEl = document.createElement('div');
+leisteEl.className = 'such-leiste';
+leisteEl.hidden = true;
+leisteEl.innerHTML = `<img src="1211.svg" alt=""><span class="such-leiste-text" role="status"></span>
+  <button type="button" data-k="aendern" aria-haspopup="dialog">Ändern</button>
+  <button type="button" data-k="aufheben" aria-label="Suche aufheben">✕</button>`;
+FEED.before(leisteEl);
+
+const sBeschreibung = z => [z.q.trim() ? `„${z.q.trim()}“` : '', [...z.kats].join(', ')].filter(Boolean).join(' · ');
+
+function sHashSchreiben(z) {
+  const u = new URLSearchParams();
+  if (z.q.trim()) u.set('suche', z.q.trim());
+  if (z.kats.size) u.set('kat', [...z.kats].join('|'));   // Namen statt Nummern: Links bleiben gültig, wenn Themen dazukommen
+  if (z.modus !== 'teil') u.set('modus', z.modus);
+  if (z.feld !== 'alle') u.set('feld', z.feld);
+  if (z.sort !== 'relevanz') u.set('sort', z.sort);
+  if (!z.tipp) u.set('tipp', '0');
+  if (!z.nur) u.set('nur', '0');
+  history.replaceState(null, '', location.pathname + location.search + (u.toString() ? '#' + u : ''));
+}
+function sHashLesen() {
+  const u = new URLSearchParams(location.hash.slice(1));
+  if (!u.has('suche') && !u.has('kat')) return false;
+  sZ.q = u.get('suche') || '';
+  const kat = u.get('kat') || '';
+  sZ.kats = new Set(/^[\d,]+$/.test(kat)
+    ? kat.split(',').map(Number).filter(i => i < S_LEIT_KATS.length).map(i => S_LEIT_KATS[i])   // ältere Links mit Nummern (0–4 = Leitforderungen)
+    : kat.split('|').filter(k => S_KATS.includes(k)));
+  if (['teil', 'anfang', 'wort'].includes(u.get('modus'))) sZ.modus = u.get('modus');
+  if (['alle', 'head', 'text'].includes(u.get('feld'))) sZ.feld = u.get('feld');
+  if (['relevanz', 'nr'].includes(u.get('sort'))) sZ.sort = u.get('sort');
+  sZ.tipp = u.get('tipp') !== '0';
+  sZ.nur = u.get('nur') !== '0';
+  return true;
+}
+
+// Filtert den Feed auf die Treffer. zielNr: diese Forderung (bzw. ihr Beitrag) steht ganz vorn.
+function sucheAnwenden(ergebnis, zielNr = null) {
+  const beitraege = sBeitraege(ergebnis.liste, sZ.nur);
+  if (zielNr != null) {
+    const i = beitraege.findIndex(p => p.slides.some(f => f.nr === zielNr));
+    if (i < 0) { toast('Diese Forderung steht in keinem Beitrag'); return false; }
+    const [p] = beitraege.splice(i, 1);
+    beitraege.unshift({ ...p, start: p.slides.findIndex(f => f.nr === zielNr) });
+  }
+  SUCHE = { z: { ...sZ, kats: new Set(sZ.kats) }, anzahl: ergebnis.liste.length, beitraege: beitraege.length };
+  lauf++;
+  ANSICHT = beitraege;
+  beitraegeZeigen(0, Math.min(ERSTE_ETAPPE, ANSICHT.length), true);
+  if (!ANSICHT.length) FEED.innerHTML = '<p class="lade-hinweis">Keine Beiträge zu dieser Suche.</p>';
+  const nr = lauf;
+  idle(() => weitere(ERSTE_ETAPPE, nr));
+  leisteEl.querySelector('.such-leiste-text').textContent =
+    `${sBeschreibung(SUCHE.z)} · ${SUCHE.anzahl} ${SUCHE.anzahl === 1 ? 'Forderung' : 'Forderungen'} in ${SUCHE.beitraege} ${SUCHE.beitraege === 1 ? 'Beitrag' : 'Beiträgen'}`;
+  leisteEl.hidden = false;
+  sHashSchreiben(sZ);
+  sLinksZeigen();
+  window.scrollTo({ top: FEED.getBoundingClientRect().top + scrollY - leisteEl.offsetHeight, behavior: 'instant' });   // Leiste oben, erster Treffer direkt darunter
+  return true;
+}
+// Suchansicht ist zu Ende (Logo angetippt oder aufgehoben): Leiste und Adresse zurücksetzen
+function sucheBeendet() {
+  SUCHE = null;
+  leisteEl.hidden = true;
+  history.replaceState(null, '', location.pathname + location.search);
+  sLinksZeigen();
+}
+// Suche aufheben: wieder alle Beiträge in der Reihenfolge vom Seitenstart
+function sucheAufheben() {
+  if (!SUCHE) return;
+  sucheBeendet();
+  lauf++;
+  ANSICHT = POSTS;
+  beitraegeZeigen(0, Math.min(ERSTE_ETAPPE, ANSICHT.length), true);
+  const nr = lauf;
+  idle(() => weitere(ERSTE_ETAPPE, nr));
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+/* ---------- Suchfenster ---------- */
+const sChipHTML = k => `<button class="such-chip" type="button" aria-pressed="false" data-kat="${esc(k)}">${esc(k)}<small></small></button>`;
+const suchEl = document.createElement('div');
+suchEl.className = 'ki-overlay';   // übernimmt Weichzeichner und Einblendung des KI-Fensters
+suchEl.innerHTML = `
+  <div class="ki-dialog such-dialog" role="dialog" aria-modal="true" aria-labelledby="such-title" tabindex="-1">
+    <div class="such-oben">
+    <div class="such-kopf">
+      <h2 class="ki-title" id="such-title">Forderungen durchsuchen</h2>
+      <button class="such-x" type="button" aria-label="Suche schließen"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3 3 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    </div>
+    <div class="such-feld">
+      <img src="1211.svg" alt="">
+      <input type="search" id="such-q" placeholder="z. B. miete -studierende, &quot;16 Euro&quot;, #120-140" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Suchbegriffe" aria-describedby="such-status" aria-controls="such-liste">
+    </div>
+    </div>
+    <div class="such-chips" role="group" aria-label="Nur diese Kategorien">
+      ${S_LEIT_KATS.map(sChipHTML).join('')}
+      <details class="such-themen">
+        <summary>Weitere Themen <small></small></summary>
+        <div class="such-themen-chips">${S_THEMEN_KATS.map(sChipHTML).join('')}</div>
+      </details>
+    </div>
+    <details class="such-mehr">
+      <summary>Optionen und Suchhilfe</summary>
+      <div class="such-optionen">
+        <label>Treffer <select data-opt="modus"><option value="teil">auch in Wortteilen</option><option value="anfang">nur am Wortanfang</option><option value="wort">nur ganze Wörter</option></select></label>
+        <label>Suchen in <select data-opt="feld"><option value="alle">Forderung und Erklärung</option><option value="head">nur Forderung (Überschrift)</option><option value="text">nur Erklärung</option></select></label>
+        <label>Sortierung <select data-opt="sort"><option value="relevanz">nach Relevanz</option><option value="nr">nach Nummer</option></select></label>
+        <label class="such-check"><input type="checkbox" data-opt="tipp"> Tippfehler tolerieren</label>
+        <label class="such-check"><input type="checkbox" data-opt="nur"> Im Feed nur die passenden Bilder zeigen</label>
+      </div>
+      <ul class="such-hilfe">
+        <li><code>miete wohnung</code> alle Begriffe müssen vorkommen</li>
+        <li><code>bus | bahn</code> oder <code>bus oder bahn</code> einer genügt</li>
+        <li><code>"16 Euro"</code> genaue Wortfolge</li>
+        <li><code>-studierende</code> Begriff ausschließen</li>
+        <li><code>titel:</code> nur in der Forderung, <code>text:</code> nur in der Erklärung, <code>kategorie:</code> im Kategorienamen</li>
+        <li><code>#12</code> <code>#10-20</code> <code>#3,7,12</code> nach Nummer</li>
+        <li>Groß-/Kleinschreibung, Umlaute (ä = ae), ß/ss, Gendersternchen und Bindestriche sind egal; „miete“ findet auch „Kaltmiete“.</li>
+        <li>Tastatur: <code>/</code> oder <code>Strg</code>+<code>K</code> öffnet die Suche, <code>Enter</code> zeigt die Treffer im Feed, <code>↓</code> springt in die Liste.</li>
+      </ul>
+    </details>
+    <p class="such-status" id="such-status" role="status" aria-live="polite"></p>
+    <div class="such-liste" id="such-liste"></div>
+    <div class="such-fuss">
+      <button class="ki-go ex-go such-go" type="button" aria-disabled="true">Im Feed zeigen</button>
+      <div class="such-fuss-zeile">
+        <button class="such-link" type="button" data-k="kopieren" hidden>Trefferliste kopieren</button>
+        <button class="such-link" type="button" data-k="aufheben" hidden>Suche im Feed aufheben</button>
+      </div>
+    </div>
+  </div>`;
+document.body.appendChild(suchEl);
+
+const suchDialog = suchEl.querySelector('.ki-dialog');
+const suchInput = suchEl.querySelector('#such-q');
+const suchStatus = suchEl.querySelector('.such-status');
+const suchListe = suchEl.querySelector('.such-liste');
+const suchThemen = suchEl.querySelector('.such-themen');
+const suchGo = suchEl.querySelector('.such-go');
+let suchOpener = null, sErgebnis = null, sGezeigt = 0, sTimer = 0;
+
+function sLinksZeigen() {
+  suchEl.querySelector('[data-k="aufheben"]').hidden = !SUCHE;
+  suchEl.querySelector('[data-k="kopieren"]').hidden = !(sErgebnis && sErgebnis.liste.length);
+}
+
+function sTrefferHTML(r) {
+  const f = r.doc.f, n = S_IN_BEITRAEGEN.get(f.nr) || 0;
+  return `<button class="such-erg" type="button" data-nr="${esc(f.nr)}">
+    <span class="such-meta">Nr. ${esc(f.nr)} · ${esc(r.doc.kat)} · ${n ? `in ${n} ${n === 1 ? 'Beitrag' : 'Beiträgen'}` : 'in keinem Beitrag'}</span>
+    <span class="such-head">${sMarkiert(r.doc.plain.head, r.doc.n.head, r.fund.head)}</span>
+    <span class="such-text">${sMarkiert(r.doc.plain.text, r.doc.n.text, r.fund.text)}</span>
+  </button>`;
+}
+
+function sListeFuellen(bis) {
+  const { liste } = sErgebnis;
+  suchListe.querySelector('.such-weiter')?.remove();
+  suchListe.insertAdjacentHTML('beforeend', liste.slice(sGezeigt, bis).map(sTrefferHTML).join(''));
+  sGezeigt = Math.min(bis, liste.length);
+  if (sGezeigt < liste.length)
+    suchListe.insertAdjacentHTML('beforeend', `<button class="such-weiter" type="button">Weitere ${Math.min(S_SEITE, liste.length - sGezeigt)} von ${liste.length - sGezeigt} anzeigen</button>`);
+}
+
+function sAktualisieren() {
+  sErgebnis = sSuchen();
+  const { liste, proKat, hinweise, aktiv } = sErgebnis;
+  suchEl.querySelectorAll('.such-chip').forEach(b => {
+    const k = b.dataset.kat, n = proKat.get(k);
+    b.setAttribute('aria-pressed', String(sZ.kats.has(k)));
+    b.querySelector('small').textContent = aktiv ? n : '';
+    b.classList.toggle('leer', aktiv && !n && !sZ.kats.has(k));
+  });
+  // Zusammenfassung am zugeklappten Themenbereich: Treffer in den Themen und gewählte Themen
+  const themenTreffer = S_THEMEN_KATS.reduce((a, k) => a + proKat.get(k), 0);
+  const themenGewaehlt = S_THEMEN_KATS.filter(k => sZ.kats.has(k)).length;
+  suchThemen.querySelector('summary small').textContent =
+    [aktiv ? `${themenTreffer} Treffer` : `${S_THEMEN_KATS.length}`, themenGewaehlt ? `${themenGewaehlt} gewählt` : ''].filter(Boolean).join(' · ');
+  // War die Liste schon hochgescrollt, neue Treffer ab ihrem Anfang zeigen (Filter bleiben dabei weiter oben hinausgescrollt)
+  const listeOben = suchListe.getBoundingClientRect().top - suchEl.querySelector('.such-oben').getBoundingClientRect().bottom;
+  if (listeOben < 0) suchDialog.scrollTop += listeOben;
+  suchListe.innerHTML = '';
+  sGezeigt = 0;
+  if (!aktiv) {
+    suchStatus.textContent = '';
+    suchListe.innerHTML = `<p class="such-leer">Suchbegriff eingeben oder eine Kategorie wählen. ${FORDERUNGEN.length} Forderungen werden durchsucht – „Optionen und Suchhilfe“ zeigt, wie sich Begriffe kombinieren und ausschließen lassen.</p>`;
+  } else {
+    const beitraege = sBeitraege(liste, sZ.nur).length;
+    suchStatus.innerHTML = esc(`${liste.length} ${liste.length === 1 ? 'Forderung' : 'Forderungen'} · in ${beitraege} ${beitraege === 1 ? 'Beitrag' : 'Beiträgen'}`) +
+      hinweise.map(h => `<span class="such-hinweis">${esc(h)}</span>`).join('');
+    if (liste.length) sListeFuellen(S_SEITE);
+    else suchListe.innerHTML = '<p class="such-leer">Keine passenden Forderungen. Weniger oder andere Begriffe probieren, Kategorien abwählen oder unter „Optionen“ die Treffer auf Wortteile erweitern.</p>';
+  }
+  const geht = aktiv && liste.length > 0;
+  const nB = geht ? sBeitraege(liste, sZ.nur).length : 0;
+  suchGo.textContent = geht ? `Im Feed zeigen (${nB} ${nB === 1 ? 'Beitrag' : 'Beiträge'})` : 'Im Feed zeigen';
+  if (geht) suchGo.removeAttribute('aria-disabled'); else suchGo.setAttribute('aria-disabled', 'true');
+  sLinksZeigen();
+}
+
+function sFormularSetzen() {
+  suchInput.value = sZ.q;
+  suchEl.querySelectorAll('[data-opt]').forEach(el => {
+    if (el.type === 'checkbox') el.checked = sZ[el.dataset.opt]; else el.value = sZ[el.dataset.opt];
+  });
+}
+
+function suchOpen(opener) {
+  if (suchEl.classList.contains('open')) return;
+  suchOpener = opener || null;
+  if (SUCHE) Object.assign(sZ, { ...SUCHE.z, kats: new Set(SUCHE.z.kats) });   // aktive Suche im Feed weiterbearbeiten
+  sFormularSetzen();
+  if (sZ.q.trim()) suchThemen.open = false;
+  sAktualisieren();
+  suchEl.classList.add('open');
+  document.documentElement.style.overflow = 'hidden';   // Seite dahinter nicht scrollbar
+  appEl.inert = true;
+  suchInput.focus();
+  suchInput.select();
+}
+function suchClose(fokus = true) {
+  suchEl.classList.remove('open');
+  document.documentElement.style.overflow = '';
+  appEl.inert = false;
+  if (fokus && suchOpener && suchOpener.isConnected) suchOpener.focus({ preventScroll: true });
+}
+function sZeigen(zielNr = null) {
+  if (!sErgebnis || !sErgebnis.aktiv || !sErgebnis.liste.length) return;
+  if (zielNr != null && !S_IN_BEITRAEGEN.has(zielNr)) { toast('Diese Forderung steht in keinem Beitrag'); return; }
+  suchClose(false);
+  if (sucheAnwenden(sErgebnis, zielNr)) leisteEl.querySelector('[data-k="aendern"]').focus({ preventScroll: true });
+}
+
+suchInput.addEventListener('input', () => {
+  sZ.q = suchInput.value;
+  if (sZ.q.trim()) suchThemen.open = false;   // beim Suchen Platz für die Trefferliste schaffen
+  clearTimeout(sTimer);
+  sTimer = setTimeout(sAktualisieren, 120);
+});
+suchInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); clearTimeout(sTimer); sAktualisieren(); sZeigen(); }
+  else if (e.key === 'ArrowDown') { const erst = suchListe.querySelector('.such-erg'); if (erst) { e.preventDefault(); erst.focus(); } }
+});
+suchListe.addEventListener('keydown', e => {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  const alle = [...suchListe.querySelectorAll('.such-erg, .such-weiter')], i = alle.indexOf(document.activeElement);
+  if (i < 0) return;
+  e.preventDefault();
+  if (e.key === 'ArrowUp' && i === 0) suchInput.focus();
+  else (alle[i + (e.key === 'ArrowDown' ? 1 : -1)] || alle[i]).focus();
+});
+suchEl.addEventListener('change', e => {
+  const o = e.target.dataset.opt;
+  if (!o) return;
+  sZ[o] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+  sAktualisieren();
+});
+suchEl.addEventListener('click', e => {
+  if (e.target === suchEl || e.target.closest('.such-x')) return suchClose();   // Tipp auf den Hintergrund oder ✕
+  const chip = e.target.closest('.such-chip');
+  if (chip) { const k = chip.dataset.kat; sZ.kats.has(k) ? sZ.kats.delete(k) : sZ.kats.add(k); return sAktualisieren(); }
+  const erg = e.target.closest('.such-erg');
+  if (erg) return sZeigen(Number(erg.dataset.nr));
+  const weiter = e.target.closest('.such-weiter');
+  if (weiter) { const i = sGezeigt; sListeFuellen(sGezeigt + S_SEITE); suchListe.querySelectorAll('.such-erg')[i]?.focus(); return; }
+  if (e.target.closest('.such-go')) return sZeigen();
+  const k = e.target.closest('[data-k]');
+  if (k && k.dataset.k === 'aufheben') { suchClose(false); sucheAufheben(); return; }
+  if (k && k.dataset.k === 'kopieren' && sErgebnis) {
+    const l = sErgebnis.liste, titel = `Suche ${sBeschreibung(sZ)} – ${l.length} ${l.length === 1 ? 'Forderung' : 'Forderungen'}`;
+    exportiereText({
+      rein: titel + '\n\n' + l.map(r => `Nr. ${r.doc.f.nr} · ${r.doc.kat}\n${r.doc.plain.head}\n${r.doc.plain.text}`).join('\n\n'),
+      html: `<p><b>${esc(titel)}</b></p>` + l.map(r => `<p>Nr. ${esc(r.doc.f.nr)} · ${esc(r.doc.kat)}<br><b>${esc(r.doc.plain.head)}</b><br>${fetttext(r.doc.f.text)}</p>`).join(''),
+    });
+  }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && suchEl.classList.contains('open')) return suchClose();
+  if (document.querySelector('.ki-overlay.open')) return;   // anderes Fenster offen
+  const tippt = e.target.closest && e.target.closest('input, textarea, select, [contenteditable="true"]');
+  if ((e.key === '/' && !tippt && !e.ctrlKey && !e.metaKey && !e.altKey) || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k')) {
+    e.preventDefault();
+    suchOpen(document.activeElement);
+  }
+});
+FEED.addEventListener('click', e => {
+  const b = e.target.closest('[data-action="suche"]');
+  if (b) suchOpen(b);
+});
+leisteEl.addEventListener('click', e => {
+  const k = e.target.closest('[data-k]');
+  if (!k) return;
+  if (k.dataset.k === 'aendern') suchOpen(k);
+  else sucheAufheben();
+});
+
+// Suche aus der Adresse (#suche=…) gleich beim Laden anwenden
+if (sHashLesen()) {
+  const erg = sSuchen();
+  if (erg.aktiv && erg.liste.length) { sErgebnis = erg; sucheAnwenden(erg); }
+}
+
+// Schnittstelle für export_thesen.py: das Skript setzt Bilder mit genau diesen Funktionen und Daten zusammen.
+// Bei Umbenennungen hier mitziehen, sonst meldet das Export-Skript, dass es angepasst werden muss.
+window.LINKSINSTA_EXPORT = Object.freeze({ FORDERUNGEN, BY_NR, POSTS, FEED_ORDER, slideHTML, fitText, verlaufVon, exportAuftrag });   // POSTS ist zufällig sortiert, FEED_ORDER in fester Reihenfolge
+
+}); // Ende DOMContentLoaded
 </script>
 </body>
 </html>
