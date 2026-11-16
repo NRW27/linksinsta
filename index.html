@@ -1216,7 +1216,7 @@ const fetttext = s => esc(String(s).replace(/\s+/g, ' ').trim()).replace(/\*\*(.
 // Wo die großen Dateien liegen (Export-Bilder, Wahlprogramm für den KI-Prompt): vorerst bei Cloudflare Pages,
 // weil sie fürs GitHub-Repo zu groß sind. Läuft alles auf dem eigenen Server, hier '' eintragen (= dieselbe Adresse wie die Seite).
 // Die Seite darf auch auf einer anderen Adresse laufen: Cloudflare Pages erlaubt den Abruf der Bilder per CORS (_headers aus veroeffentlichen.py).
-const DATEI_HOST = 'https://main.linksinsta.pages.dev/';
+const DATEI_HOST = '';
 // Ordner und Endungen der fertig gesetzten Bilder (export_thesen.py, Standard-Zielordner export-bilder/); erste vorhandene Datei gewinnt
 const EXPORT_BILDER = { ordner: DATEI_HOST + 'export-bilder/', endungen: ['jpg', 'png'] };
 const hintergrundPng = f => EXPORT_BILDER.ordner + String(f.img).replace(/\.[^.]+$/, '') + '.png';   // 0001.jpg → export-bilder/0001.png
@@ -1224,8 +1224,8 @@ const beitragsBilder = (f, gruppe) => EXPORT_BILDER.endungen.map(e => `${EXPORT_
 // gesperrt: true – Art ist sichtbar, aber nicht wählbar (Hinweis in Rot), z. B. solange die Bilddateien nicht online liegen.
 const EXPORT_GESPERRT_HINWEIS = 'Dateien stehen noch nicht zur Verfügung';
 const EXPORT_ARTEN = [
-  { id: 'beitrag', name: 'Ganzer Beitrag', info: (f, g) => 'Bild mit Text: ' + exportName(f.nr, g), bild: (f, g) => beitragsBilder(f, g) },
-  { id: 'bild',    name: 'Nur das Bild',   info: f => 'Bilddatei: ' + dateiName(hintergrundPng(f)), bild: f => [hintergrundPng(f)] },
+  { id: 'beitrag', gesperrt: true, name: 'Ganzer Beitrag', info: (f, g) => 'Bild mit Text: ' + exportName(f.nr, g), bild: (f, g) => beitragsBilder(f, g) },
+  { id: 'bild',    gesperrt: true, name: 'Nur das Bild',   info: f => 'Bilddatei: ' + dateiName(hintergrundPng(f)), bild: f => [hintergrundPng(f)] },
   { id: 'text',    name: 'Nur der Text',   info: () => 'Forderung und Erklärung, wird kopiert',
     text: f => ({
       rein: klartext(f.head) + '\n\n' + klartext(f.text),
@@ -1417,7 +1417,7 @@ document.addEventListener('keydown', e => {
    Der Browser merkt sich nur sein Token (Berechtigung, Herzen zu vergeben) und welche Beiträge
    er selbst mit einem Herz versehen hat. Ist der Server nicht erreichbar, bleiben die zuletzt
    bekannten Zahlen stehen und ein Tipp wird zurückgenommen. */
-const HEARTS_API = 'https://herzen.DEIN-NAME.workers.dev';   // Worker unter eigener Domain (Route /api/*): '' eintragen
+const HEARTS_API = '';   // Worker unter eigener Domain (Route /api/*): '' eintragen
 
 
 const hearts = { counts: store.get(HK.counts, {}), mine: new Set(store.get(HK.mine, [])), busy: new Set() };
@@ -1453,7 +1453,7 @@ const paintHearts = () => document.querySelectorAll('.act.like').forEach(b => pa
 
 async function loadHearts() {
   try {
-    const r = await fetch(HEARTS_API + '/api/hearts');
+    if (!HEARTS_API) throw 0; const r = await fetch(HEARTS_API + '/api/hearts');
     if (!r.ok) throw r.status;
     hearts.counts = (await r.json()).counts;
     store.set(HK.counts, hearts.counts);
@@ -1472,7 +1472,7 @@ async function toggleLike(btn) {
   paintLike(btn, true);
 
   try {
-    const r = await fetch(HEARTS_API + '/api/heart', {
+    if (!HEARTS_API) throw 0; const r = await fetch(HEARTS_API + '/api/heart', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Voter': store.get(HK.token, '') },
       body: JSON.stringify({ post: id, on: want }),
